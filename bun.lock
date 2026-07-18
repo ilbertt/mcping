@@ -22,14 +22,6 @@
         "typescript": "catalog:",
       },
     },
-    "packages/my-package": {
-      "name": "@repo/my-package",
-      "devDependencies": {
-        "@repo/pack-utils": "workspace:*",
-        "@repo/typescript-config": "workspace:*",
-        "typescript": "catalog:",
-      },
-    },
     "packages/pack-utils": {
       "name": "@repo/pack-utils",
       "devDependencies": {
@@ -106,8 +98,6 @@
     "@conventional-changelog/template": ["@conventional-changelog/template@1.2.1", "", {}, "sha512-TzlTVpKPjaqW6qOYjQcYUDuGsLCNsvFHVBXkYGTAnf5V37jCWrE5haKNXzz0WZUtVHjrpV76L1buANjwXMfT8w=="],
 
     "@repo/my-app": ["@repo/my-app@workspace:apps/my-app"],
-
-    "@repo/my-package": ["@repo/my-package@workspace:packages/my-package"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 
