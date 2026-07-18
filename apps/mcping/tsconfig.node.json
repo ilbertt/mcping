@@ -1,17 +1,10 @@
 {
-  "extends": "@repo/typescript-config/base.json",
+  "extends": "@repo/typescript-config/node.json",
   "compilerOptions": {
     "composite": true,
     "rootDir": ".",
-    "types": ["node"],
-    "lib": ["ESNext"],
     "tsBuildInfoFile": "./tsconfig.node.tsbuildinfo"
   },
-  "include": [
-    "src/main",
-    "src/preload",
-    "src/shared",
-    "electron.vite.config.ts"
-  ],
+  "include": ["src/main", "src/preload", "src/shared"],
   "exclude": ["node_modules", "dist"]
 }
