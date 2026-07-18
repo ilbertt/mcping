@@ -1,8 +1,11 @@
+import { Notification as DesktopNotification } from 'electron';
 import type { Notification } from 'mcp-use/client';
 import { checkAccessibility } from '#main/accessibility.ts';
 import { openClaudeDesktopWithText } from '#main/claude-desktop.ts';
 import { log } from '#main/logger.ts';
 import { getSettings } from '#main/settings-store.ts';
+import type { Settings } from '#shared/types.ts';
+import { APP_NAME } from '#shared/types.ts';
 
 const TEST_ACTION_TEXT =
   'mcping test action 👋\nIf you can read this, the Claude Desktop driver works.';
@@ -12,17 +15,41 @@ interface NotificationParams {
   timestamp?: string;
 }
 
-async function driveClaude(options: {
+async function driveApp(options: {
   text: string;
   autoSend: boolean;
   appName: string;
 }): Promise<void> {
   try {
     await openClaudeDesktopWithText(options);
-    log({ level: 'info', message: 'Opened Claude Desktop with notification text' });
+    log({ level: 'info', message: `Opened ${options.appName} with the action text` });
   } catch (error) {
-    log({ level: 'error', message: `Failed to drive Claude Desktop: ${String(error)}` });
+    log({ level: 'error', message: `Failed to open ${options.appName}: ${String(error)}` });
   }
+}
+
+// Approval prompt for a background menu-bar app: a clickable system
+// notification. Clicking it approves and runs the action; ignoring it declines.
+function requestApproval(options: { text: string; appName: string; onApprove: () => void }): void {
+  const notification = new DesktopNotification({
+    title: `${APP_NAME}: open ${options.appName}?`,
+    body: options.text,
+  });
+  notification.on('click', options.onApprove);
+  notification.show();
+}
+
+function runAction(options: { text: string; settings: Settings }): void {
+  const { text, settings } = options;
+  const drive = (): void => {
+    void driveApp({ text, autoSend: settings.autoSend, appName: settings.claudeAppName });
+  };
+  if (settings.requireApproval && DesktopNotification.isSupported()) {
+    log({ level: 'info', message: 'Action pending approval — click the notification to open' });
+    requestApproval({ text, appName: settings.claudeAppName, onApprove: drive });
+    return;
+  }
+  drive();
 }
 
 export function handleNotification(notification: Notification): void {
@@ -38,19 +65,25 @@ export function handleNotification(notification: Notification): void {
     return;
   }
   if (!checkAccessibility().trusted) {
-    log({ level: 'error', message: 'Accessibility not granted; cannot open Claude Desktop' });
+    log({
+      level: 'error',
+      message: `Accessibility not granted; cannot open ${settings.claudeAppName}`,
+    });
     return;
   }
-  void driveClaude({ text, autoSend: settings.autoSend, appName: settings.claudeAppName });
+  runAction({ text, settings });
 }
 
 export async function runTestAction(): Promise<void> {
   const settings = getSettings();
   if (!checkAccessibility().trusted) {
-    log({ level: 'error', message: 'Accessibility not granted; cannot open Claude Desktop' });
+    log({
+      level: 'error',
+      message: `Accessibility not granted; cannot open ${settings.claudeAppName}`,
+    });
     return;
   }
-  await driveClaude({
+  await driveApp({
     text: TEST_ACTION_TEXT,
     autoSend: settings.autoSend,
     appName: settings.claudeAppName,

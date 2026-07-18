@@ -3,6 +3,7 @@ export const APP_NAME = 'mcping';
 export interface Settings {
   serverUrl: string;
   notificationMethod: string;
+  requireApproval: boolean;
   autoSend: boolean;
   claudeAppName: string;
   autoConnect: boolean;
@@ -10,9 +11,12 @@ export interface Settings {
 }
 
 // 127.0.0.1 (not localhost) avoids IPv4/IPv6 ambiguity on the default host.
+// requireApproval defaults on: a remote server should not silently drive a
+// desktop app without the user confirming each action.
 export const DEFAULT_SETTINGS: Settings = {
   serverUrl: 'http://127.0.0.1:3050/mcp',
   notificationMethod: 'custom/test',
+  requireApproval: true,
   autoSend: false,
   claudeAppName: 'Claude',
   autoConnect: true,
