@@ -19,6 +19,7 @@ const config: Configuration = {
   files: ['dist/**', 'resources/**', 'package.json'],
   mac: {
     category: 'public.app-category.productivity',
+    icon: 'build/icon.png',
     // zip target enables a future electron-updater feed alongside the DMG.
     target: ['dmg', 'zip'],
     hardenedRuntime: true,
