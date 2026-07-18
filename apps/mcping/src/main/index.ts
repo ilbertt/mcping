@@ -32,6 +32,3 @@ function onFatal(error: unknown): void {
 }
 
 app.whenReady().then(onReady).catch(onFatal);
-
-// Keep running in the menu bar when every window is closed (there are none yet).
-app.on('window-all-closed', () => {});
