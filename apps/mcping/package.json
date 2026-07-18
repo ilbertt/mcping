@@ -2,13 +2,21 @@
   "name": "@repo/mcping",
   "private": true,
   "type": "module",
+  "main": "./dist/main/index.js",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun",
-    "check:types": "bun run --bun tsc"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "check:types": "bun run --bun tsc",
+    "postinstall": "install-electron"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "typescript": "catalog:"
+    "@types/node": "^26.1.1",
+    "electron": "^43.1.1",
+    "electron-vite": "^5.0.0",
+    "typescript": "catalog:",
+    "vite": "^8.1.5"
   },
   "imports": {
     "#*": "./src/*"

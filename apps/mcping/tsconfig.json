@@ -1,8 +1,9 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "rootDir": "."
+    "rootDir": ".",
+    "types": ["node"]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "electron.vite.config.ts"],
+  "exclude": ["node_modules", "dist", "out"]
 }
