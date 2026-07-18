@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "release": "electron-builder",
+    "release": "bun run ./release.ts",
     "start": "electron-vite preview",
     "check:types": "bun run --bun tsc -b",
     "postinstall": "install-electron"
