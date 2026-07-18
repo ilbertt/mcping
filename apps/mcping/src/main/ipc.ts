@@ -3,10 +3,18 @@ import { ipcMain } from 'electron';
 import { checkAccessibility, openAccessibilitySettings } from '#main/accessibility.ts';
 import { getLog } from '#main/logger.ts';
 import { syncLoginItem } from '#main/login-item.ts';
-import { connect, disconnect, getStatus } from '#main/mcp-listener.ts';
+import { connectServer, disconnectServer, getStatuses, syncServers } from '#main/mcp-listener.ts';
 import { runTestAction } from '#main/notification-handler.ts';
-import { getSettings, updateSettings } from '#main/settings-store.ts';
-import type { Settings } from '#shared/types.ts';
+import {
+  addServer,
+  getServer,
+  getSettings,
+  removeServer,
+  updateServer,
+  updateSettings,
+} from '#main/settings-store.ts';
+import { refreshTray } from '#main/tray.ts';
+import type { ServerDraft, Settings } from '#shared/types.ts';
 import { IPC } from '#shared/types.ts';
 
 function handle<Req, Res>(options: {
@@ -16,9 +24,17 @@ function handle<Req, Res>(options: {
   ipcMain.handle(options.channel, (...args: [IpcMainInvokeEvent, Req]) => options.handler(args[1]));
 }
 
+// After the server list changes: reconcile live connections and rebuild the tray
+// so both track the new configuration.
+function applyServerChange(next: Settings): Settings {
+  syncServers();
+  refreshTray();
+  return next;
+}
+
 export function registerIpc(): void {
   handle({ channel: IPC.settingsGet, handler: () => getSettings() });
-  handle<Partial<Settings>, Settings>({
+  handle<Partial<Omit<Settings, 'servers'>>, Settings>({
     channel: IPC.settingsSet,
     handler: (patch) => {
       const next = updateSettings(patch);
@@ -26,10 +42,30 @@ export function registerIpc(): void {
       return next;
     },
   });
-  handle({ channel: IPC.mcpConnect, handler: () => connect() });
-  handle({ channel: IPC.mcpDisconnect, handler: () => disconnect() });
-  handle({ channel: IPC.mcpGetStatus, handler: () => getStatus() });
-  handle({ channel: IPC.mcpTestAction, handler: () => runTestAction() });
+  handle<ServerDraft, Settings>({
+    channel: IPC.serversAdd,
+    handler: (draft) => applyServerChange(addServer(draft)),
+  });
+  handle<{ id: string; patch: Partial<ServerDraft> }, Settings>({
+    channel: IPC.serversUpdate,
+    handler: (options) => applyServerChange(updateServer(options)),
+  });
+  handle<string, Settings>({
+    channel: IPC.serversRemove,
+    handler: (id) => applyServerChange(removeServer(id)),
+  });
+  handle<string, void>({ channel: IPC.mcpConnect, handler: (id) => connectServer(id) });
+  handle<string, void>({ channel: IPC.mcpDisconnect, handler: (id) => disconnectServer(id) });
+  handle({ channel: IPC.mcpGetStatuses, handler: () => getStatuses() });
+  handle<string, void>({
+    channel: IPC.mcpTestAction,
+    handler: async (id) => {
+      const server = getServer(id);
+      if (server) {
+        await runTestAction(server);
+      }
+    },
+  });
   handle({ channel: IPC.accessibilityCheck, handler: () => checkAccessibility() });
   handle({ channel: IPC.accessibilityOpenSettings, handler: () => openAccessibilitySettings() });
   handle({ channel: IPC.logGet, handler: () => getLog() });

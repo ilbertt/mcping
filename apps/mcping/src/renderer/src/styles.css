@@ -149,6 +149,70 @@ body {
   color: var(--accent);
 }
 
+.button--danger {
+  border-color: var(--warn-fg);
+  background: transparent;
+  color: var(--warn-fg);
+}
+
+.servers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.server {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.server__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.server__summary::-webkit-details-marker {
+  display: none;
+}
+
+.server__summary::before {
+  content: '›';
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.server[open] .server__summary::before {
+  transform: rotate(90deg);
+}
+
+.server__title {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.card__actions {
+  flex-wrap: wrap;
+}
+
 .pill {
   padding: 2px 10px;
   border-radius: 999px;

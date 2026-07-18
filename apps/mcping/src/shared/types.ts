@@ -1,25 +1,34 @@
 export const APP_NAME = 'mcping';
 
-export interface Settings {
-  serverUrl: string;
-  notificationMethod: string;
+export interface McpServer {
+  id: string;
+  name: string;
+  url: string;
+  autoConnect: boolean;
   requireApproval: boolean;
   autoSend: boolean;
-  claudeAppName: string;
-  autoConnect: boolean;
+}
+
+export interface Settings {
+  servers: McpServer[];
   launchAtLogin: boolean;
 }
 
+// Per-server defaults, reused as the seed for a fresh install and as the
+// template when the user adds a server.
 // 127.0.0.1 (not localhost) avoids IPv4/IPv6 ambiguity on the default host.
 // requireApproval defaults on: a remote server should not silently drive a
 // desktop app without the user confirming each action.
-export const DEFAULT_SETTINGS: Settings = {
-  serverUrl: 'http://127.0.0.1:3050/mcp',
-  notificationMethod: 'custom/test',
+export const DEFAULT_SERVER: Omit<McpServer, 'id'> = {
+  name: 'My server',
+  url: 'http://127.0.0.1:3050/mcp',
+  autoConnect: true,
   requireApproval: true,
   autoSend: false,
-  claudeAppName: 'Claude',
-  autoConnect: true,
+};
+
+export const DEFAULT_SETTINGS: Settings = {
+  servers: [{ id: 'default', ...DEFAULT_SERVER }],
   launchAtLogin: false,
 };
 
@@ -28,6 +37,11 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
 export interface ConnectionStatus {
   state: ConnectionState;
   detail?: string;
+}
+
+export interface ServerStatus {
+  serverId: string;
+  status: ConnectionStatus;
 }
 
 export interface AccessibilityStatus {
@@ -45,9 +59,12 @@ export interface LogEntry {
 export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
+  serversAdd: 'servers:add',
+  serversUpdate: 'servers:update',
+  serversRemove: 'servers:remove',
   mcpConnect: 'mcp:connect',
   mcpDisconnect: 'mcp:disconnect',
-  mcpGetStatus: 'mcp:get-status',
+  mcpGetStatuses: 'mcp:get-statuses',
   mcpStatus: 'mcp:status',
   mcpTestAction: 'mcp:test-action',
   accessibilityCheck: 'accessibility:check',
@@ -56,14 +73,19 @@ export const IPC = {
   logEntry: 'log:entry',
 } as const;
 
+export type ServerDraft = Omit<McpServer, 'id'>;
+
 export interface McpingApi {
   getSettings: () => Promise<Settings>;
-  setSettings: (patch: Partial<Settings>) => Promise<Settings>;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  getStatus: () => Promise<ConnectionStatus>;
-  onStatus: (listener: (status: ConnectionStatus) => void) => () => void;
-  runTestAction: () => Promise<void>;
+  setSettings: (patch: Partial<Omit<Settings, 'servers'>>) => Promise<Settings>;
+  addServer: (draft: ServerDraft) => Promise<Settings>;
+  updateServer: (options: { id: string; patch: Partial<ServerDraft> }) => Promise<Settings>;
+  removeServer: (id: string) => Promise<Settings>;
+  connect: (serverId: string) => Promise<void>;
+  disconnect: (serverId: string) => Promise<void>;
+  getStatuses: () => Promise<ServerStatus[]>;
+  onStatus: (listener: (status: ServerStatus) => void) => () => void;
+  runTestAction: (serverId: string) => Promise<void>;
   checkAccessibility: () => Promise<AccessibilityStatus>;
   openAccessibilitySettings: () => Promise<void>;
   getLog: () => Promise<LogEntry[]>;

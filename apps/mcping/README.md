@@ -1,9 +1,18 @@
 # mcping
 
-**Let MCP servers ping you.** A macOS menu-bar app that connects to a remote
-[MCP](https://modelcontextprotocol.io) server over Streamable HTTP, listens for a
-custom notification, and — with your approval — opens your AI desktop app (Claude
-Desktop by default) in a new chat pre-filled with the notification's text.
+**Let MCP servers ping you.** A macOS menu-bar app that connects to one or more
+[MCP](https://modelcontextprotocol.io) servers over Streamable HTTP, listens for
+their notifications, and — with your approval — runs the action the server asks
+for from a small, controlled catalog (currently: open Claude Desktop in a new chat
+pre-filled with the notification's text).
+
+Every server is configured independently: its own URL, whether it connects at
+launch, and its approval / auto-send behavior.
+
+**Why a fixed action catalog?** A connected server names an action from a list
+mcping defines (in [`src/main/actions.ts`](./src/main/actions.ts)) — it can never
+name an arbitrary app or shell command. That's the boundary that stops a server
+from using mcping to run code on your machine.
 
 Built with [Electron](https://www.electronjs.org/) and
 [electron-vite](https://electron-vite.org/). It lives in the menu bar only — no
@@ -35,20 +44,25 @@ supply-chain hardening change), so this package runs
 bun run --filter @repo/mcping dev
 ```
 
-A menu-bar icon appears (labelled `mcping` next to the placeholder icon). Use its
-menu to Connect/Disconnect, run a Test action, or open Settings.
+A menu-bar icon appears (labelled `mcping` next to the placeholder icon). Its
+**MCP servers** submenu lists every configured server with its connection state;
+click a server to connect it (or disconnect it if already connected). Open
+Settings to add, edit, or remove servers and to run a per-server Test action.
 
 ## How it works
 
-1. It connects to the configured MCP server (`http://127.0.0.1:3050/mcp` by
-   default) and keeps the Streamable-HTTP stream open, reconnecting with backoff.
-2. When a notification arrives whose method matches `notificationMethod`
-   (`custom/test` by default), it reads the `text` param.
-3. If **Ask for approval** is on (default), it posts a clickable system
-   notification; clicking it runs the action. If off, it runs immediately.
-4. It copies the text to the clipboard and drives the target app via AppleScript:
-   Cmd+N for a new chat, clicks the real **Edit ▸ Paste** menu item, and
-   optionally presses Return (when **Send automatically** is on).
+1. Each server connects to its configured URL (`http://127.0.0.1:3050/mcp` by
+   default) and keeps its own Streamable-HTTP stream open, reconnecting with
+   backoff independently of the others.
+2. When a notification arrives, mcping reads its `action` param and looks it up in
+   the controlled catalog. Unknown actions are ignored. A recognized action reads
+   its inputs (e.g. the `text` param) from the notification.
+3. If the server's **Ask for approval** is on (default), it posts a clickable
+   system notification; clicking it runs the action. If off, it runs immediately.
+4. For the `prompt` action it copies the text to the clipboard and drives Claude
+   Desktop via AppleScript: Cmd+N for a new chat, clicks the real **Edit ▸ Paste**
+   menu item, and optionally presses Return (when that server's **Send
+   automatically** is on).
 
 ## Permissions
 
@@ -86,7 +100,8 @@ prompt; an unsigned one hits the "cannot check for malicious software" wall.
 - **Tray icon:** `resources/iconTemplate.png` (+ `@2x`) is a monochrome "ping"
   (broadcast waves) glyph. As a macOS template image it adapts to light/dark
   menu bars automatically.
-- **Not just Claude:** the driver targets an app by name and uses generic
-  new-chat + paste steps, so it can point at Codex or other AI desktop apps
-  later — set the app name in Settings. Menu labels (`Edit`/`Paste`) assume
-  English; the driver accepts overrides.
+- **Not just Claude:** the driver (`src/main/claude-desktop.ts`) targets an app by
+  name and uses generic new-chat + paste steps, so pointing at Codex or another AI
+  desktop app is a matter of adding an entry to the action catalog
+  (`src/main/actions.ts`) — the target app stays controlled by mcping, never by the
+  server. Menu labels (`Edit`/`Paste`) assume English; the driver accepts overrides.

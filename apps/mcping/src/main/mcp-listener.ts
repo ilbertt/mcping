@@ -3,148 +3,239 @@ import { log } from '#main/logger.ts';
 import { handleNotification } from '#main/notification-handler.ts';
 import { sendStatus } from '#main/renderer-events.ts';
 import { getSettings } from '#main/settings-store.ts';
-import type { ConnectionStatus } from '#shared/types.ts';
+import type { ConnectionStatus, McpServer, ServerStatus } from '#shared/types.ts';
 
-const SERVER_KEY = 'mcping';
+const SESSION_KEY = 'server';
 const MS_PER_SECOND = 1000;
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30_000;
 const BACKOFF_FACTOR = 2;
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 
-type StatusListener = (status: ConnectionStatus) => void;
+class ServerConnection {
+  private server: McpServer;
+  private readonly onStatus: (status: ConnectionStatus) => void;
+  private client: MCPClient | null = null;
+  private status: ConnectionStatus = { state: 'disconnected' };
+  private desiredConnected = false;
+  private backoffMs = INITIAL_BACKOFF_MS;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private healthTimer: NodeJS.Timeout | null = null;
 
+  constructor(options: { server: McpServer; onStatus: (status: ConnectionStatus) => void }) {
+    this.server = options.server;
+    this.onStatus = options.onStatus;
+  }
+
+  getStatus(): ConnectionStatus {
+    return this.status;
+  }
+
+  updateConfig(server: McpServer): void {
+    const urlChanged = this.server.url !== server.url;
+    this.server = server;
+    if (urlChanged && this.desiredConnected) {
+      void this.connect();
+    }
+  }
+
+  private setStatus(next: ConnectionStatus): void {
+    this.status = next;
+    this.onStatus(next);
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  private stopHealthCheck(): void {
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = null;
+    }
+  }
+
+  private async disposeClient(): Promise<void> {
+    this.stopHealthCheck();
+    if (this.client) {
+      const closing = this.client;
+      this.client = null;
+      try {
+        await closing.closeAllSessions();
+      } catch (error) {
+        log({
+          level: 'warn',
+          message: `[${this.server.name}] Error closing sessions: ${String(error)}`,
+        });
+      }
+    }
+  }
+
+  private scheduleReconnect(): void {
+    this.clearReconnectTimer();
+    const delay = this.backoffMs;
+    this.backoffMs = Math.min(this.backoffMs * BACKOFF_FACTOR, MAX_BACKOFF_MS);
+    log({
+      level: 'info',
+      message: `[${this.server.name}] Reconnecting in ${Math.round(delay / MS_PER_SECOND)}s`,
+    });
+    this.reconnectTimer = setTimeout(() => {
+      void this.attemptConnect();
+    }, delay);
+  }
+
+  private startHealthCheck(): void {
+    this.stopHealthCheck();
+    this.healthTimer = setInterval(() => {
+      if (!this.client || !this.desiredConnected || this.status.state !== 'connected') {
+        return;
+      }
+      const connected = this.client.getSession(SESSION_KEY)?.connector.isClientConnected ?? false;
+      if (!connected) {
+        log({ level: 'warn', message: `[${this.server.name}] Connection lost` });
+        this.setStatus({ state: 'error', detail: 'Connection lost' });
+        void this.reconnectAfterDrop();
+      }
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  private async reconnectAfterDrop(): Promise<void> {
+    await this.disposeClient();
+    if (this.desiredConnected) {
+      this.scheduleReconnect();
+    }
+  }
+
+  private async attemptConnect(): Promise<void> {
+    if (!this.desiredConnected) {
+      return;
+    }
+    const { url, name } = this.server;
+    this.setStatus({ state: 'connecting', detail: url });
+    log({ level: 'info', message: `[${name}] Connecting to ${url}` });
+    try {
+      const next = new MCPClient(
+        { mcpServers: { [SESSION_KEY]: { url } } },
+        {
+          onNotification: (notification) =>
+            handleNotification({ notification, server: this.server }),
+        },
+      );
+      await next.createSession(SESSION_KEY);
+      this.client = next;
+      this.backoffMs = INITIAL_BACKOFF_MS;
+      this.setStatus({ state: 'connected', detail: url });
+      log({ level: 'info', message: `[${name}] Connected` });
+      this.startHealthCheck();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      log({ level: 'error', message: `[${name}] Connection failed: ${detail}` });
+      this.setStatus({ state: 'error', detail });
+      await this.disposeClient();
+      if (this.desiredConnected) {
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  async connect(): Promise<void> {
+    this.desiredConnected = true;
+    this.clearReconnectTimer();
+    this.backoffMs = INITIAL_BACKOFF_MS;
+    await this.disposeClient();
+    await this.attemptConnect();
+  }
+
+  async disconnect(): Promise<void> {
+    this.desiredConnected = false;
+    this.clearReconnectTimer();
+    await this.disposeClient();
+    this.setStatus({ state: 'disconnected' });
+    log({ level: 'info', message: `[${this.server.name}] Disconnected` });
+  }
+
+  async dispose(): Promise<void> {
+    this.desiredConnected = false;
+    this.clearReconnectTimer();
+    await this.disposeClient();
+  }
+}
+
+type StatusListener = (status: ServerStatus) => void;
+
+const connections = new Map<string, ServerConnection>();
 const statusListeners = new Set<StatusListener>();
 
-let client: MCPClient | null = null;
-let status: ConnectionStatus = { state: 'disconnected' };
-let desiredConnected = false;
-let backoffMs = INITIAL_BACKOFF_MS;
-let reconnectTimer: NodeJS.Timeout | null = null;
-let healthTimer: NodeJS.Timeout | null = null;
-
-export function getStatus(): ConnectionStatus {
-  return status;
+function emit(serverStatus: ServerStatus): void {
+  sendStatus(serverStatus);
+  for (const listener of statusListeners) {
+    listener(serverStatus);
+  }
 }
 
 export function onStatusChange(listener: StatusListener): void {
   statusListeners.add(listener);
 }
 
-function setStatus(next: ConnectionStatus): void {
-  status = next;
-  sendStatus(next);
-  for (const listener of statusListeners) {
-    listener(next);
-  }
+export function getStatuses(): ServerStatus[] {
+  return getSettings().servers.map((server) => ({
+    serverId: server.id,
+    status: connections.get(server.id)?.getStatus() ?? { state: 'disconnected' },
+  }));
 }
 
-function clearReconnectTimer(): void {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+// Reconcile the connection registry against the persisted server list: create
+// connections for new servers, dispose those whose server was removed, and push
+// config changes into the rest.
+export function syncServers(): void {
+  const { servers } = getSettings();
+  const desiredIds = new Set(servers.map((server) => server.id));
+  for (const [id, connection] of connections) {
+    if (!desiredIds.has(id)) {
+      void connection.dispose();
+      connections.delete(id);
+    }
   }
-}
-
-function stopHealthCheck(): void {
-  if (healthTimer) {
-    clearInterval(healthTimer);
-    healthTimer = null;
-  }
-}
-
-async function disposeClient(): Promise<void> {
-  stopHealthCheck();
-  if (client) {
-    const closing = client;
-    client = null;
-    try {
-      await closing.closeAllSessions();
-    } catch (error) {
-      log({ level: 'warn', message: `Error closing sessions: ${String(error)}` });
+  for (const server of servers) {
+    const existing = connections.get(server.id);
+    if (existing) {
+      existing.updateConfig(server);
+    } else {
+      connections.set(
+        server.id,
+        new ServerConnection({
+          server,
+          onStatus: (status) => emit({ serverId: server.id, status }),
+        }),
+      );
     }
   }
 }
 
-function scheduleReconnect(): void {
-  clearReconnectTimer();
-  const delay = backoffMs;
-  backoffMs = Math.min(backoffMs * BACKOFF_FACTOR, MAX_BACKOFF_MS);
-  log({ level: 'info', message: `Reconnecting in ${Math.round(delay / MS_PER_SECOND)}s` });
-  reconnectTimer = setTimeout(() => {
-    void attemptConnect();
-  }, delay);
-}
-
-function startHealthCheck(): void {
-  stopHealthCheck();
-  healthTimer = setInterval(() => {
-    if (!client || !desiredConnected || status.state !== 'connected') {
-      return;
-    }
-    const connected = client.getSession(SERVER_KEY)?.connector.isClientConnected ?? false;
-    if (!connected) {
-      log({ level: 'warn', message: 'Connection lost' });
-      setStatus({ state: 'error', detail: 'Connection lost' });
-      void reconnectAfterDrop();
-    }
-  }, HEALTH_CHECK_INTERVAL_MS);
-}
-
-async function reconnectAfterDrop(): Promise<void> {
-  await disposeClient();
-  if (desiredConnected) {
-    scheduleReconnect();
+export async function connectServer(serverId: string): Promise<void> {
+  if (!connections.has(serverId)) {
+    syncServers();
   }
+  await connections.get(serverId)?.connect();
 }
 
-async function attemptConnect(): Promise<void> {
-  if (!desiredConnected) {
-    return;
-  }
-  const { serverUrl } = getSettings();
-  setStatus({ state: 'connecting', detail: serverUrl });
-  log({ level: 'info', message: `Connecting to ${serverUrl}` });
-  try {
-    const next = new MCPClient(
-      { mcpServers: { [SERVER_KEY]: { url: serverUrl } } },
-      { onNotification: handleNotification },
-    );
-    await next.createSession(SERVER_KEY);
-    client = next;
-    backoffMs = INITIAL_BACKOFF_MS;
-    setStatus({ state: 'connected', detail: serverUrl });
-    log({ level: 'info', message: 'Connected' });
-    startHealthCheck();
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    log({ level: 'error', message: `Connection failed: ${detail}` });
-    setStatus({ state: 'error', detail });
-    await disposeClient();
-    if (desiredConnected) {
-      scheduleReconnect();
+export async function disconnectServer(serverId: string): Promise<void> {
+  await connections.get(serverId)?.disconnect();
+}
+
+export function connectAutoConnectServers(): void {
+  syncServers();
+  for (const server of getSettings().servers) {
+    if (server.autoConnect) {
+      void connections.get(server.id)?.connect();
     }
   }
 }
 
-export async function connect(): Promise<void> {
-  desiredConnected = true;
-  clearReconnectTimer();
-  backoffMs = INITIAL_BACKOFF_MS;
-  await disposeClient();
-  await attemptConnect();
-}
-
-export async function disconnect(): Promise<void> {
-  desiredConnected = false;
-  clearReconnectTimer();
-  await disposeClient();
-  setStatus({ state: 'disconnected' });
-  log({ level: 'info', message: 'Disconnected' });
-}
-
-export async function shutdown(): Promise<void> {
-  desiredConnected = false;
-  clearReconnectTimer();
-  await disposeClient();
+export async function shutdownAll(): Promise<void> {
+  await Promise.all([...connections.values()].map((connection) => connection.dispose()));
+  connections.clear();
 }

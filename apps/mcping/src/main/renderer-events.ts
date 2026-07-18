@@ -1,5 +1,5 @@
 import { getSettingsWindow } from '#main/settings-window.ts';
-import type { ConnectionStatus, LogEntry } from '#shared/types.ts';
+import type { LogEntry, ServerStatus } from '#shared/types.ts';
 import { IPC } from '#shared/types.ts';
 
 function send(options: { channel: string; payload: unknown }): void {
@@ -9,7 +9,7 @@ function send(options: { channel: string; payload: unknown }): void {
   }
 }
 
-export function sendStatus(status: ConnectionStatus): void {
+export function sendStatus(status: ServerStatus): void {
   send({ channel: IPC.mcpStatus, payload: status });
 }
 

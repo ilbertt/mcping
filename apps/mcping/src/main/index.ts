@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { checkAccessibility } from '#main/accessibility.ts';
 import { registerIpc } from '#main/ipc.ts';
 import { syncLoginItem } from '#main/login-item.ts';
-import { connect, shutdown } from '#main/mcp-listener.ts';
+import { connectAutoConnectServers, shutdownAll } from '#main/mcp-listener.ts';
 import { getSettings } from '#main/settings-store.ts';
 import { showSettingsWindow } from '#main/settings-window.ts';
 import { createTray } from '#main/tray.ts';
@@ -20,9 +20,7 @@ function onReady(): void {
   createTray();
   // Surface the system Accessibility prompt once if the permission is missing.
   checkAccessibility({ prompt: true });
-  if (getSettings().autoConnect) {
-    void connect();
-  }
+  connectAutoConnectServers();
 }
 
 function onFatal(error: unknown): void {
@@ -41,7 +39,7 @@ function onBeforeQuit(event: Electron.Event): void {
   const deadline = new Promise<void>((resolve) => {
     setTimeout(resolve, QUIT_TEARDOWN_TIMEOUT_MS);
   });
-  void Promise.race([shutdown(), deadline]).finally(() => {
+  void Promise.race([shutdownAll(), deadline]).finally(() => {
     app.quit();
   });
 }

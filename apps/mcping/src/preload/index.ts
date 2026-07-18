@@ -1,6 +1,6 @@
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ConnectionStatus, LogEntry, McpingApi } from '#shared/types.ts';
+import type { LogEntry, McpingApi, ServerStatus } from '#shared/types.ts';
 import { IPC } from '#shared/types.ts';
 
 function subscribe<T>(options: { channel: string; listener: (payload: T) => void }): () => void {
@@ -16,11 +16,14 @@ function subscribe<T>(options: { channel: string; listener: (payload: T) => void
 const api: McpingApi = {
   getSettings: () => ipcRenderer.invoke(IPC.settingsGet),
   setSettings: (patch) => ipcRenderer.invoke(IPC.settingsSet, patch),
-  connect: () => ipcRenderer.invoke(IPC.mcpConnect),
-  disconnect: () => ipcRenderer.invoke(IPC.mcpDisconnect),
-  getStatus: () => ipcRenderer.invoke(IPC.mcpGetStatus),
-  onStatus: (listener) => subscribe<ConnectionStatus>({ channel: IPC.mcpStatus, listener }),
-  runTestAction: () => ipcRenderer.invoke(IPC.mcpTestAction),
+  addServer: (draft) => ipcRenderer.invoke(IPC.serversAdd, draft),
+  updateServer: (options) => ipcRenderer.invoke(IPC.serversUpdate, options),
+  removeServer: (id) => ipcRenderer.invoke(IPC.serversRemove, id),
+  connect: (serverId) => ipcRenderer.invoke(IPC.mcpConnect, serverId),
+  disconnect: (serverId) => ipcRenderer.invoke(IPC.mcpDisconnect, serverId),
+  getStatuses: () => ipcRenderer.invoke(IPC.mcpGetStatuses),
+  onStatus: (listener) => subscribe<ServerStatus>({ channel: IPC.mcpStatus, listener }),
+  runTestAction: (serverId) => ipcRenderer.invoke(IPC.mcpTestAction, serverId),
   checkAccessibility: () => ipcRenderer.invoke(IPC.accessibilityCheck),
   openAccessibilitySettings: () => ipcRenderer.invoke(IPC.accessibilityOpenSettings),
   getLog: () => ipcRenderer.invoke(IPC.logGet),

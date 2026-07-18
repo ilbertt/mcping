@@ -1,91 +1,101 @@
 import { Notification as DesktopNotification } from 'electron';
 import type { Notification } from 'mcp-use/client';
 import { checkAccessibility } from '#main/accessibility.ts';
-import { openClaudeDesktopWithText } from '#main/claude-desktop.ts';
+import type { ActionInput, SupportedAction } from '#main/actions.ts';
+import { findAction, TEST_ACTION_NAME } from '#main/actions.ts';
 import { log } from '#main/logger.ts';
-import { getSettings } from '#main/settings-store.ts';
-import type { Settings } from '#shared/types.ts';
+import type { McpServer } from '#shared/types.ts';
 import { APP_NAME } from '#shared/types.ts';
 
 const TEST_ACTION_TEXT =
   'mcping test action 👋\nIf you can read this, the Claude Desktop driver works.';
 
+// A server names the action it wants (from mcping's controlled catalog) and its
+// inputs in the notification params. The notification method itself is up to the
+// server and is not matched here.
 interface NotificationParams {
+  action?: string;
   text?: string;
-  timestamp?: string;
 }
 
-async function driveApp(options: {
-  text: string;
-  autoSend: boolean;
-  appName: string;
-}): Promise<void> {
+async function runAndLog(options: { action: SupportedAction; input: ActionInput }): Promise<void> {
   try {
-    await openClaudeDesktopWithText(options);
-    log({ level: 'info', message: `Opened ${options.appName} with the action text` });
+    await options.action.run(options.input);
+    log({ level: 'info', message: `Ran action: ${options.action.label}` });
   } catch (error) {
-    log({ level: 'error', message: `Failed to open ${options.appName}: ${String(error)}` });
+    log({ level: 'error', message: `Action failed (${options.action.label}): ${String(error)}` });
   }
 }
 
 // Approval prompt for a background menu-bar app: a clickable system
 // notification. Clicking it approves and runs the action; ignoring it declines.
-function requestApproval(options: { text: string; appName: string; onApprove: () => void }): void {
+function requestApproval(options: { text: string; label: string; onApprove: () => void }): void {
   const notification = new DesktopNotification({
-    title: `${APP_NAME}: open ${options.appName}?`,
+    title: `${APP_NAME}: ${options.label}?`,
     body: options.text,
   });
   notification.on('click', options.onApprove);
   notification.show();
 }
 
-function runAction(options: { text: string; settings: Settings }): void {
-  const { text, settings } = options;
+function runWithApproval(options: {
+  action: SupportedAction;
+  input: ActionInput;
+  requireApproval: boolean;
+}): void {
+  const { action, input, requireApproval } = options;
   const drive = (): void => {
-    void driveApp({ text, autoSend: settings.autoSend, appName: settings.claudeAppName });
+    void runAndLog({ action, input });
   };
-  if (settings.requireApproval && DesktopNotification.isSupported()) {
-    log({ level: 'info', message: 'Action pending approval — click the notification to open' });
-    requestApproval({ text, appName: settings.claudeAppName, onApprove: drive });
+  if (requireApproval && DesktopNotification.isSupported()) {
+    log({
+      level: 'info',
+      message: `Action pending approval — click the notification to ${action.label}`,
+    });
+    requestApproval({ text: input.text, label: action.label, onApprove: drive });
     return;
   }
   drive();
 }
 
-export function handleNotification(notification: Notification): void {
-  const settings = getSettings();
-  if (notification.method !== settings.notificationMethod) {
-    log({ level: 'info', message: `Ignoring notification: ${notification.method}` });
+export function handleNotification(options: {
+  notification: Notification;
+  server: McpServer;
+}): void {
+  const { notification, server } = options;
+  const params = (notification.params ?? {}) as NotificationParams;
+  const action = findAction(params.action ?? '');
+  if (!action) {
+    log({
+      level: 'info',
+      message: `[${server.name}] Ignoring notification (unsupported action: ${params.action ?? 'none'})`,
+    });
     return;
   }
-  const params = (notification.params ?? {}) as NotificationParams;
   const text = params.text ?? '';
   if (!text) {
-    log({ level: 'warn', message: 'Matching notification had no text' });
+    log({ level: 'warn', message: `[${server.name}] Action "${params.action}" had no text` });
     return;
   }
   if (!checkAccessibility().trusted) {
-    log({
-      level: 'error',
-      message: `Accessibility not granted; cannot open ${settings.claudeAppName}`,
-    });
+    log({ level: 'error', message: `Accessibility not granted; cannot ${action.label}` });
     return;
   }
-  runAction({ text, settings });
+  runWithApproval({
+    action,
+    input: { text, autoSend: server.autoSend },
+    requireApproval: server.requireApproval,
+  });
 }
 
-export async function runTestAction(): Promise<void> {
-  const settings = getSettings();
-  if (!checkAccessibility().trusted) {
-    log({
-      level: 'error',
-      message: `Accessibility not granted; cannot open ${settings.claudeAppName}`,
-    });
+export async function runTestAction(server: McpServer): Promise<void> {
+  const action = findAction(TEST_ACTION_NAME);
+  if (!action) {
     return;
   }
-  await driveApp({
-    text: TEST_ACTION_TEXT,
-    autoSend: settings.autoSend,
-    appName: settings.claudeAppName,
-  });
+  if (!checkAccessibility().trusted) {
+    log({ level: 'error', message: `Accessibility not granted; cannot ${action.label}` });
+    return;
+  }
+  await runAndLog({ action, input: { text: TEST_ACTION_TEXT, autoSend: server.autoSend } });
 }

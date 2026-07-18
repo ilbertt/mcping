@@ -1,9 +1,15 @@
+import type { MenuItemConstructorOptions } from 'electron';
 import { Menu, Tray } from 'electron';
-import { connect, disconnect, getStatus, onStatusChange } from '#main/mcp-listener.ts';
-import { runTestAction } from '#main/notification-handler.ts';
+import {
+  connectServer,
+  disconnectServer,
+  getStatuses,
+  onStatusChange,
+} from '#main/mcp-listener.ts';
+import { getSettings } from '#main/settings-store.ts';
 import { showSettingsWindow } from '#main/settings-window.ts';
 import { createTrayIcon } from '#main/tray-icon.ts';
-import type { ConnectionState, ConnectionStatus } from '#shared/types.ts';
+import type { ConnectionState } from '#shared/types.ts';
 import { APP_NAME } from '#shared/types.ts';
 
 let tray: Tray | null = null;
@@ -15,34 +21,43 @@ const STATUS_LABEL: Record<ConnectionState, string> = {
   error: 'Connection error',
 };
 
-function buildMenu(status: ConnectionStatus): Menu {
-  const isConnected = status.state === 'connected';
-  const isBusy = status.state === 'connecting';
+function statusStates(): Map<string, ConnectionState> {
+  return new Map(getStatuses().map((entry) => [entry.serverId, entry.status.state]));
+}
+
+function serversSubmenu(states: Map<string, ConnectionState>): MenuItemConstructorOptions[] {
+  const { servers } = getSettings();
+  if (servers.length === 0) {
+    return [{ label: 'No servers — open Settings…', enabled: false }];
+  }
+  return servers.map((server) => {
+    const state = states.get(server.id) ?? 'disconnected';
+    const active = state === 'connected' || state === 'connecting';
+    return {
+      label: `${server.name} — ${STATUS_LABEL[state]}`,
+      type: 'checkbox',
+      checked: state === 'connected',
+      click: () => {
+        if (active) {
+          void disconnectServer(server.id);
+        } else {
+          void connectServer(server.id);
+        }
+      },
+    };
+  });
+}
+
+function buildMenu(): Menu {
+  const { servers } = getSettings();
+  const states = statusStates();
+  const connected = servers.filter((server) => states.get(server.id) === 'connected').length;
   return Menu.buildFromTemplate([
     { label: APP_NAME, enabled: false },
-    { label: STATUS_LABEL[status.state], enabled: false },
+    { label: `${connected} of ${servers.length} connected`, enabled: false },
     { type: 'separator' },
-    {
-      label: 'Connect',
-      enabled: !(isConnected || isBusy),
-      click: () => {
-        void connect();
-      },
-    },
-    {
-      label: 'Disconnect',
-      enabled: isConnected || isBusy,
-      click: () => {
-        void disconnect();
-      },
-    },
+    { label: 'MCP servers', submenu: serversSubmenu(states) },
     { type: 'separator' },
-    {
-      label: 'Test action',
-      click: () => {
-        void runTestAction();
-      },
-    },
     {
       label: 'Settings…',
       click: () => {
@@ -54,16 +69,19 @@ function buildMenu(status: ConnectionStatus): Menu {
   ]);
 }
 
-function refresh(status: ConnectionStatus): void {
+export function refreshTray(): void {
   if (!tray) {
     return;
   }
-  tray.setContextMenu(buildMenu(status));
-  tray.setToolTip(`${APP_NAME} — ${STATUS_LABEL[status.state]}`);
+  const { servers } = getSettings();
+  const states = statusStates();
+  const connected = servers.filter((server) => states.get(server.id) === 'connected').length;
+  tray.setContextMenu(buildMenu());
+  tray.setToolTip(`${APP_NAME} — ${connected} of ${servers.length} connected`);
 }
 
 export function createTray(): void {
   tray = new Tray(createTrayIcon());
-  refresh(getStatus());
-  onStatusChange(refresh);
+  refreshTray();
+  onStatusChange(refreshTray);
 }
