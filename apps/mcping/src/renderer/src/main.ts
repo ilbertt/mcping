@@ -83,6 +83,9 @@ function wireConnection(): void {
   requireElement<HTMLButtonElement>('#disconnect').addEventListener('click', () => {
     void api.disconnect();
   });
+  requireElement<HTMLButtonElement>('#test-action').addEventListener('click', () => {
+    void api.runTestAction();
+  });
 }
 
 function renderAccessibility(status: AccessibilityStatus): void {

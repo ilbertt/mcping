@@ -20,6 +20,7 @@ const api: McpingApi = {
   disconnect: () => ipcRenderer.invoke(IPC.mcpDisconnect),
   getStatus: () => ipcRenderer.invoke(IPC.mcpGetStatus),
   onStatus: (listener) => subscribe<ConnectionStatus>({ channel: IPC.mcpStatus, listener }),
+  runTestAction: () => ipcRenderer.invoke(IPC.mcpTestAction),
   checkAccessibility: () => ipcRenderer.invoke(IPC.accessibilityCheck),
   openAccessibilitySettings: () => ipcRenderer.invoke(IPC.accessibilityOpenSettings),
   getLog: () => ipcRenderer.invoke(IPC.logGet),

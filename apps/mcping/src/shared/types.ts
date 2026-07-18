@@ -45,6 +45,7 @@ export const IPC = {
   mcpDisconnect: 'mcp:disconnect',
   mcpGetStatus: 'mcp:get-status',
   mcpStatus: 'mcp:status',
+  mcpTestAction: 'mcp:test-action',
   accessibilityCheck: 'accessibility:check',
   accessibilityOpenSettings: 'accessibility:open-settings',
   logGet: 'log:get',
@@ -58,6 +59,7 @@ export interface McpingApi {
   disconnect: () => Promise<void>;
   getStatus: () => Promise<ConnectionStatus>;
   onStatus: (listener: (status: ConnectionStatus) => void) => () => void;
+  runTestAction: () => Promise<void>;
   checkAccessibility: () => Promise<AccessibilityStatus>;
   openAccessibilitySettings: () => Promise<void>;
   getLog: () => Promise<LogEntry[]>;

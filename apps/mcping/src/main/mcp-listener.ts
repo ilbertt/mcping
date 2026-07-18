@@ -1,6 +1,6 @@
-import type { Notification } from 'mcp-use/client';
 import { MCPClient } from 'mcp-use/client';
 import { log } from '#main/logger.ts';
+import { handleNotification } from '#main/notification-handler.ts';
 import { sendStatus } from '#main/renderer-events.ts';
 import { getSettings } from '#main/settings-store.ts';
 import type { ConnectionStatus } from '#shared/types.ts';
@@ -37,11 +37,6 @@ function setStatus(next: ConnectionStatus): void {
   for (const listener of statusListeners) {
     listener(next);
   }
-}
-
-function onNotification(notification: Notification): void {
-  // Phase 3 turns matching notifications into a Claude Desktop chat.
-  log({ level: 'info', message: `Notification received: ${notification.method}` });
 }
 
 function clearReconnectTimer(): void {
@@ -113,7 +108,7 @@ async function attemptConnect(): Promise<void> {
   try {
     const next = new MCPClient(
       { mcpServers: { [SERVER_KEY]: { url: serverUrl } } },
-      { onNotification },
+      { onNotification: handleNotification },
     );
     await next.createSession(SERVER_KEY);
     client = next;

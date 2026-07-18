@@ -1,5 +1,6 @@
 import { Menu, Tray } from 'electron';
 import { connect, disconnect, getStatus, onStatusChange } from '#main/mcp-listener.ts';
+import { runTestAction } from '#main/notification-handler.ts';
 import { showSettingsWindow } from '#main/settings-window.ts';
 import { createTrayIcon } from '#main/tray-icon.ts';
 import type { ConnectionState, ConnectionStatus } from '#shared/types.ts';
@@ -36,6 +37,12 @@ function buildMenu(status: ConnectionStatus): Menu {
       },
     },
     { type: 'separator' },
+    {
+      label: 'Test action',
+      click: () => {
+        void runTestAction();
+      },
+    },
     {
       label: 'Settings…',
       click: () => {
