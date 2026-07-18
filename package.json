@@ -3,7 +3,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build:bundle": "bun run --bun turbo build:bundle",
+    "build": "bun run --bun turbo build",
+    "release": "bun run --bun turbo release",
     "check:types": "bun run --bun turbo check:types",
     "check:codestyle": "bun run --bun biome check",
     "check:all": "bun check:types && bun check:codestyle",

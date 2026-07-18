@@ -17,4 +17,4 @@ jobs:
       - uses: ./.github/actions/prepare
 
       - name: Build
-        run: bun run build:bundle
+        run: bun run build
