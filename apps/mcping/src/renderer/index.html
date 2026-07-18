@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mcping settings</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="app__header">
+        <h1 class="app__title">mcping</h1>
+        <p class="app__subtitle">Listen to an MCP server and open Claude Desktop on notifications.</p>
+      </header>
+
+      <section class="card">
+        <h2 class="card__title">Server</h2>
+        <label class="field">
+          <span class="field__label">Server URL</span>
+          <input class="field__input" type="text" data-setting="serverUrl" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field__label">Notification method</span>
+          <input class="field__input" type="text" data-setting="notificationMethod" spellcheck="false" />
+        </label>
+        <label class="field field--switch">
+          <input type="checkbox" data-setting="autoConnect" />
+          <span class="field__label">Connect automatically on launch</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">Claude Desktop</h2>
+        <label class="field">
+          <span class="field__label">App name</span>
+          <input class="field__input" type="text" data-setting="claudeAppName" spellcheck="false" />
+        </label>
+        <label class="field field--switch">
+          <input type="checkbox" data-setting="autoSend" />
+          <span class="field__label">Send the message automatically (otherwise pre-fill only)</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">Launch</h2>
+        <label class="field field--switch">
+          <input type="checkbox" data-setting="launchAtLogin" />
+          <span class="field__label">Launch at login</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="card__row">
+          <h2 class="card__title">Accessibility</h2>
+          <span id="accessibility-pill" class="pill">Checking…</span>
+        </div>
+        <p class="card__hint">
+          Driving Claude Desktop needs the macOS Accessibility permission. After granting it,
+          restart mcping.
+        </p>
+        <div class="card__actions">
+          <button id="accessibility-open" type="button" class="button">Open Accessibility settings</button>
+          <button id="accessibility-recheck" type="button" class="button button--ghost">Re-check</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card__title">Log</h2>
+        <ol id="log" class="log"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

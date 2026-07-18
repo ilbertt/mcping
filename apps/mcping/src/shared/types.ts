@@ -1,0 +1,50 @@
+export const APP_NAME = 'mcping';
+
+export interface Settings {
+  serverUrl: string;
+  notificationMethod: string;
+  autoSend: boolean;
+  claudeAppName: string;
+  autoConnect: boolean;
+  launchAtLogin: boolean;
+}
+
+// 127.0.0.1 (not localhost) avoids IPv4/IPv6 ambiguity on the default host.
+export const DEFAULT_SETTINGS: Settings = {
+  serverUrl: 'http://127.0.0.1:3050/mcp',
+  notificationMethod: 'custom/test',
+  autoSend: false,
+  claudeAppName: 'Claude',
+  autoConnect: true,
+  launchAtLogin: false,
+};
+
+export interface AccessibilityStatus {
+  trusted: boolean;
+}
+
+export type LogLevel = 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  time: string;
+  level: LogLevel;
+  message: string;
+}
+
+export const IPC = {
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  accessibilityCheck: 'accessibility:check',
+  accessibilityOpenSettings: 'accessibility:open-settings',
+  logGet: 'log:get',
+  logEntry: 'log:entry',
+} as const;
+
+export interface McpingApi {
+  getSettings: () => Promise<Settings>;
+  setSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  checkAccessibility: () => Promise<AccessibilityStatus>;
+  openAccessibilitySettings: () => Promise<void>;
+  getLog: () => Promise<LogEntry[]>;
+  onLog: (listener: (entry: LogEntry) => void) => () => void;
+}

@@ -11,7 +11,7 @@
     "build": "electron-vite build",
     "release": "electron-builder",
     "start": "electron-vite preview",
-    "check:types": "bun run --bun tsc",
+    "check:types": "bun run --bun tsc -b",
     "postinstall": "install-electron"
   },
   "devDependencies": {
@@ -25,5 +25,9 @@
   },
   "imports": {
     "#*": "./src/*"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "mcp-use": "^1.34.3"
   }
 }

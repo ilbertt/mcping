@@ -7,4 +7,15 @@ export default defineConfig({
       externalizeDeps: true,
     },
   },
+  preload: {
+    build: {
+      outDir: 'dist/preload',
+      externalizeDeps: true,
+    },
+  },
+  renderer: {
+    build: {
+      outDir: 'dist/renderer',
+    },
+  },
 });
