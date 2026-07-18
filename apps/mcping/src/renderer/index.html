@@ -13,6 +13,18 @@
       </header>
 
       <section class="card">
+        <div class="card__row">
+          <h2 class="card__title">Connection</h2>
+          <span id="status-pill" class="pill">…</span>
+        </div>
+        <p id="status-detail" class="card__hint"></p>
+        <div class="card__actions">
+          <button id="connect" type="button" class="button">Connect</button>
+          <button id="disconnect" type="button" class="button button--ghost">Disconnect</button>
+        </div>
+      </section>
+
+      <section class="card">
         <h2 class="card__title">Server</h2>
         <label class="field">
           <span class="field__label">Server URL</span>

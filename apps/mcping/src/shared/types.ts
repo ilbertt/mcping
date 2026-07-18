@@ -19,6 +19,13 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: false,
 };
 
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface ConnectionStatus {
+  state: ConnectionState;
+  detail?: string;
+}
+
 export interface AccessibilityStatus {
   trusted: boolean;
 }
@@ -34,6 +41,10 @@ export interface LogEntry {
 export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
+  mcpConnect: 'mcp:connect',
+  mcpDisconnect: 'mcp:disconnect',
+  mcpGetStatus: 'mcp:get-status',
+  mcpStatus: 'mcp:status',
   accessibilityCheck: 'accessibility:check',
   accessibilityOpenSettings: 'accessibility:open-settings',
   logGet: 'log:get',
@@ -43,6 +54,10 @@ export const IPC = {
 export interface McpingApi {
   getSettings: () => Promise<Settings>;
   setSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  getStatus: () => Promise<ConnectionStatus>;
+  onStatus: (listener: (status: ConnectionStatus) => void) => () => void;
   checkAccessibility: () => Promise<AccessibilityStatus>;
   openAccessibilitySettings: () => Promise<void>;
   getLog: () => Promise<LogEntry[]>;

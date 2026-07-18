@@ -1,10 +1,23 @@
 import './styles.css';
-import type { AccessibilityStatus, LogEntry, Settings } from '#shared/types.ts';
+import type {
+  AccessibilityStatus,
+  ConnectionState,
+  ConnectionStatus,
+  LogEntry,
+  Settings,
+} from '#shared/types.ts';
 
 const api = window.mcping;
 
 const ACCESSIBILITY_GRANTED = 'Granted';
 const ACCESSIBILITY_MISSING = 'Not granted';
+
+const STATUS_LABEL: Record<ConnectionState, string> = {
+  disconnected: 'Disconnected',
+  connecting: 'Connecting…',
+  connected: 'Connected',
+  error: 'Error',
+};
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -50,6 +63,28 @@ function wireForm(): void {
   }
 }
 
+function renderStatus(status: ConnectionStatus): void {
+  const pill = requireElement<HTMLElement>('#status-pill');
+  pill.textContent = STATUS_LABEL[status.state];
+  pill.classList.toggle('pill--ok', status.state === 'connected');
+  pill.classList.toggle('pill--warn', status.state === 'error');
+  requireElement<HTMLElement>('#status-detail').textContent = status.detail ?? '';
+
+  const isBusy = status.state === 'connecting';
+  const isConnected = status.state === 'connected';
+  requireElement<HTMLButtonElement>('#connect').disabled = isConnected || isBusy;
+  requireElement<HTMLButtonElement>('#disconnect').disabled = !(isConnected || isBusy);
+}
+
+function wireConnection(): void {
+  requireElement<HTMLButtonElement>('#connect').addEventListener('click', () => {
+    void api.connect();
+  });
+  requireElement<HTMLButtonElement>('#disconnect').addEventListener('click', () => {
+    void api.disconnect();
+  });
+}
+
 function renderAccessibility(status: AccessibilityStatus): void {
   const pill = requireElement<HTMLElement>('#accessibility-pill');
   pill.textContent = status.trusted ? ACCESSIBILITY_GRANTED : ACCESSIBILITY_MISSING;
@@ -91,6 +126,10 @@ function wireAccessibility(): void {
 async function init(): Promise<void> {
   fillForm(await api.getSettings());
   wireForm();
+
+  wireConnection();
+  renderStatus(await api.getStatus());
+  api.onStatus(renderStatus);
 
   wireAccessibility();
   await refreshAccessibility();

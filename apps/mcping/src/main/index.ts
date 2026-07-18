@@ -1,5 +1,7 @@
 import { app } from 'electron';
 import { registerIpc } from '#main/ipc.ts';
+import { connect } from '#main/mcp-listener.ts';
+import { getSettings } from '#main/settings-store.ts';
 import { createTray } from '#main/tray.ts';
 import { APP_NAME } from '#shared/types.ts';
 
@@ -8,6 +10,9 @@ function onReady(): void {
   app.dock?.hide();
   registerIpc();
   createTray();
+  if (getSettings().autoConnect) {
+    void connect();
+  }
 }
 
 function onFatal(error: unknown): void {

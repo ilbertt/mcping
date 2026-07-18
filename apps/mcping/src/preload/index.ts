@@ -1,6 +1,6 @@
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
-import type { LogEntry, McpingApi } from '#shared/types.ts';
+import type { ConnectionStatus, LogEntry, McpingApi } from '#shared/types.ts';
 import { IPC } from '#shared/types.ts';
 
 function subscribe<T>(options: { channel: string; listener: (payload: T) => void }): () => void {
@@ -16,6 +16,10 @@ function subscribe<T>(options: { channel: string; listener: (payload: T) => void
 const api: McpingApi = {
   getSettings: () => ipcRenderer.invoke(IPC.settingsGet),
   setSettings: (patch) => ipcRenderer.invoke(IPC.settingsSet, patch),
+  connect: () => ipcRenderer.invoke(IPC.mcpConnect),
+  disconnect: () => ipcRenderer.invoke(IPC.mcpDisconnect),
+  getStatus: () => ipcRenderer.invoke(IPC.mcpGetStatus),
+  onStatus: (listener) => subscribe<ConnectionStatus>({ channel: IPC.mcpStatus, listener }),
   checkAccessibility: () => ipcRenderer.invoke(IPC.accessibilityCheck),
   openAccessibilitySettings: () => ipcRenderer.invoke(IPC.accessibilityOpenSettings),
   getLog: () => ipcRenderer.invoke(IPC.logGet),
