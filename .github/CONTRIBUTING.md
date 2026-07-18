@@ -1,10 +1,10 @@
-# Contributing to <repository-name>
+# Contributing to mcping
 
 ## Development setup
 
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/ilbertt/mcping
+cd mcping
 bun install
 ```
 
