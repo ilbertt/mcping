@@ -83,9 +83,9 @@ prompt; an unsigned one hits the "cannot check for malicious software" wall.
 
 ## Notes
 
-- **Tray icon:** `resources/iconTemplate.png` (+ `@2x`) is a placeholder — TODO:
-  replace with real branding. It is a macOS template image, so it adapts to
-  light/dark menu bars automatically.
+- **Tray icon:** `resources/iconTemplate.png` (+ `@2x`) is a monochrome "ping"
+  (broadcast waves) glyph. As a macOS template image it adapts to light/dark
+  menu bars automatically.
 - **Not just Claude:** the driver targets an app by name and uses generic
   new-chat + paste steps, so it can point at Codex or other AI desktop apps
   later — set the app name in Settings. Menu labels (`Edit`/`Paste`) assume

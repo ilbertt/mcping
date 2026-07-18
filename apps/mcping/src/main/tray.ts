@@ -64,9 +64,6 @@ function refresh(status: ConnectionStatus): void {
 
 export function createTray(): void {
   tray = new Tray(createTrayIcon());
-  // Show the name next to the placeholder icon so the app is easy to spot in
-  // the menu bar. TODO: drop once there's a real icon.
-  tray.setTitle(APP_NAME);
   refresh(getStatus());
   onStatusChange(refresh);
 }
