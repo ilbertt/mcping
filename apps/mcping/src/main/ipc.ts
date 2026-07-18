@@ -2,6 +2,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 import { checkAccessibility, openAccessibilitySettings } from '#main/accessibility.ts';
 import { getLog } from '#main/logger.ts';
+import { syncLoginItem } from '#main/login-item.ts';
 import { connect, disconnect, getStatus } from '#main/mcp-listener.ts';
 import { runTestAction } from '#main/notification-handler.ts';
 import { getSettings, updateSettings } from '#main/settings-store.ts';
@@ -19,7 +20,11 @@ export function registerIpc(): void {
   handle({ channel: IPC.settingsGet, handler: () => getSettings() });
   handle<Partial<Settings>, Settings>({
     channel: IPC.settingsSet,
-    handler: (patch) => updateSettings(patch),
+    handler: (patch) => {
+      const next = updateSettings(patch);
+      syncLoginItem(next);
+      return next;
+    },
   });
   handle({ channel: IPC.mcpConnect, handler: () => connect() });
   handle({ channel: IPC.mcpDisconnect, handler: () => disconnect() });

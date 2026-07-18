@@ -1,15 +1,25 @@
 import { app } from 'electron';
+import { checkAccessibility } from '#main/accessibility.ts';
 import { registerIpc } from '#main/ipc.ts';
-import { connect } from '#main/mcp-listener.ts';
+import { syncLoginItem } from '#main/login-item.ts';
+import { connect, shutdown } from '#main/mcp-listener.ts';
 import { getSettings } from '#main/settings-store.ts';
+import { showSettingsWindow } from '#main/settings-window.ts';
 import { createTray } from '#main/tray.ts';
 import { APP_NAME } from '#shared/types.ts';
+
+const QUIT_TEARDOWN_TIMEOUT_MS = 2000;
+
+let tornDown = false;
 
 function onReady(): void {
   // Menu-bar only: no Dock icon, no main window on launch.
   app.dock?.hide();
+  syncLoginItem(getSettings());
   registerIpc();
   createTray();
+  // Surface the system Accessibility prompt once if the permission is missing.
+  checkAccessibility({ prompt: true });
   if (getSettings().autoConnect) {
     void connect();
   }
@@ -20,4 +30,34 @@ function onFatal(error: unknown): void {
   app.quit();
 }
 
-app.whenReady().then(onReady).catch(onFatal);
+function onBeforeQuit(event: Electron.Event): void {
+  if (tornDown) {
+    return;
+  }
+  // Close MCP sessions before quitting, but never let a slow teardown block the
+  // quit: race it against a short timeout.
+  event.preventDefault();
+  tornDown = true;
+  const deadline = new Promise<void>((resolve) => {
+    setTimeout(resolve, QUIT_TEARDOWN_TIMEOUT_MS);
+  });
+  void Promise.race([shutdown(), deadline]).finally(() => {
+    app.quit();
+  });
+}
+
+function bootstrap(): void {
+  app.on('second-instance', () => {
+    showSettingsWindow();
+  });
+  app.on('before-quit', onBeforeQuit);
+  app.whenReady().then(onReady).catch(onFatal);
+}
+
+// Single instance: a second launch focuses the running app instead of starting
+// another tray icon and MCP connection.
+if (app.requestSingleInstanceLock()) {
+  bootstrap();
+} else {
+  app.quit();
+}
