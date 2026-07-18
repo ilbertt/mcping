@@ -1,0 +1,10 @@
+{
+  "extends": "@repo/typescript-config/node.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "tsBuildInfoFile": "./tsconfig.build.tsbuildinfo"
+  },
+  "include": ["electron.vite.config.ts", "release.ts"],
+  "exclude": ["node_modules", "dist"]
+}
