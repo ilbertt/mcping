@@ -23,7 +23,7 @@ After finishing an implementation, always run:
 
 1. `bun fix:codestyle` — auto-fix formatting/lint issues
 2. `bun check:all` — verify types and codestyle pass
-3. `bun run build` — verify the build succeeds
+3. `bun run build:bundle` — verify the build succeeds
 
 Check `package.json` scripts (root and per-app) for other available commands.
 

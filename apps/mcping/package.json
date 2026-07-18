@@ -2,10 +2,14 @@
   "name": "@repo/mcping",
   "private": true,
   "type": "module",
+  "version": "0.1.0",
+  "description": "Receive notifications from MCP servers",
+  "author": "ilbertt",
   "main": "./dist/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build:bundle": "electron-vite build",
+    "build": "bun run build:bundle && electron-builder",
     "start": "electron-vite preview",
     "check:types": "bun run --bun tsc",
     "postinstall": "install-electron"
@@ -14,6 +18,7 @@
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^26.1.1",
     "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "typescript": "catalog:",
     "vite": "^8.1.5"
