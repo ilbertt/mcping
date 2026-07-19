@@ -1,3 +1,3 @@
 # mcping
 
-Receive notifications from MCP servers
+Let MCP servers ping you
