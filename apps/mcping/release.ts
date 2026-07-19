@@ -1,35 +1,36 @@
-import type { Configuration } from 'electron-builder';
-import { build, Platform } from 'electron-builder';
+import { join } from 'node:path';
+import { $ } from 'bun';
+import { type AfterPackContext, build, type Configuration, Platform } from 'electron-builder';
 
 const LS_UI_ELEMENT = 1;
+const APP_ID = 'com.ilbertt.mcping';
+const PRODUCT_NAME = 'mcping';
 
-// Signing and notarization are gated behind env vars so a plain `bun run
-// release` produces an unsigned build for local testing. Provide CSC_LINK /
-// CSC_KEY_PASSWORD (Developer ID cert) and APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD
-// / APPLE_TEAM_ID (notarization) in CI to produce a signed + notarized build.
-const shouldSign = Boolean(process.env.CSC_LINK || process.env.APPLE_ID);
+// No Developer ID for now: every build is ad-hoc signed locally. electron-builder
+// skips its own signing (identity: null) and this hook re-signs the packed .app
+// with the bundle id as the signing identifier. Without it the app keeps the
+// Electron binary's default "Electron" signing identity, and macOS won't deliver
+// notifications — authorization is keyed to the signing identity, not the bundle id.
+const adhocSign = async (context: AfterPackContext): Promise<void> => {
+  const appPath = join(context.appOutDir, `${PRODUCT_NAME}.app`);
+  await $`codesign --force --deep --sign - --identifier ${APP_ID} ${appPath}`;
+};
 
 const config: Configuration = {
-  appId: 'com.ilbertt.mcping',
-  productName: 'mcping',
+  appId: APP_ID,
+  productName: PRODUCT_NAME,
   directories: {
     output: 'release',
     buildResources: 'build',
   },
   files: ['dist/**', 'resources/**', 'package.json'],
+  afterPack: adhocSign,
   mac: {
     category: 'public.app-category.productivity',
     icon: 'build/icon.png',
     // zip target enables a future electron-updater feed alongside the DMG.
     target: ['dmg', 'zip'],
-    hardenedRuntime: true,
-    gatekeeperAssess: false,
-    entitlements: 'build/entitlements.mac.plist',
-    entitlementsInherit: 'build/entitlements.mac.plist',
-    // Unsigned local builds skip code signing entirely; when signing env is
-    // present, let electron-builder discover the Developer ID certificate.
-    identity: shouldSign ? undefined : null,
-    notarize: shouldSign,
+    identity: null,
     extendInfo: {
       // Menu-bar only: no Dock icon for the packaged app (matches app.dock.hide()).
       LSUIElement: LS_UI_ELEMENT,
