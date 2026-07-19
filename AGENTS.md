@@ -1,6 +1,7 @@
 ## Project
 
-Bun + TypeScript monorepo (`apps/*`, `packages/*`).
+Bun + TypeScript monorepo (`apps/*`, `packages/*`, plus a top-level `demo/`
+workspace for local, hands-on testing).
 
 ## Stack
 

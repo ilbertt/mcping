@@ -33,6 +33,17 @@
         "vite": "^8.1.5",
       },
     },
+    "demo": {
+      "name": "@repo/demo",
+      "dependencies": {
+        "@repo/mcping-protocol": "workspace:*",
+        "mcp-use": "catalog:",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/mcping-protocol": {
       "name": "@repo/mcping-protocol",
       "dependencies": {
@@ -438,6 +449,8 @@
     "@redis/search": ["@redis/search@5.10.0", "", { "peerDependencies": { "@redis/client": "^5.10.0" } }, "sha512-3SVcPswoSfp2HnmWbAGUzlbUPn7fOohVu2weUQ0S+EMiQi8jwjL+aN2p6V3TI65eNfVsJ8vyPvqWklm6H6esmg=="],
 
     "@redis/time-series": ["@redis/time-series@5.10.0", "", { "peerDependencies": { "@redis/client": "^5.10.0" } }, "sha512-cPkpddXH5kc/SdRhF0YG0qtjL+noqFT0AcHbQ6axhsPsO7iqPi1cjxgdkE9TNeKiBUUdCaU1DbqkR/LzbzPBhg=="],
+
+    "@repo/demo": ["@repo/demo@workspace:demo"],
 
     "@repo/mcping": ["@repo/mcping@workspace:apps/mcping"],
 
