@@ -14,8 +14,32 @@ the notifications they send you.
 ## Usage
 
 Download the app from the
-[latest release](https://github.com/ilbertt/mcping/releases/latest), open it, and
-connect to your favorite MCP servers.
+[latest release](https://github.com/ilbertt/mcping/releases/latest), drag it to
+your Applications folder, open it, and connect to your favorite MCP servers.
+
+> [!NOTE]
+> mcping isn't notarized by Apple, so on first launch macOS may say it's
+> "damaged and can't be opened." It isn't — macOS just quarantines apps it can't
+> verify. Clear the quarantine flag once and open it normally:
+>
+> ```sh
+> xattr -cr /Applications/mcping.app
+> ```
+
+## Build from source
+
+Don't want to trust the prebuilt binary? Build your own. You'll need
+[Bun](https://bun.sh) and macOS.
+
+```sh
+git clone https://github.com/ilbertt/mcping.git
+cd mcping
+bun install
+bun run release
+```
+
+The packaged `.app` and `.dmg` land in `apps/mcping/release/`. An app you build
+locally isn't quarantined, so it opens without the Gatekeeper prompt above.
 
 ## How it works
 
