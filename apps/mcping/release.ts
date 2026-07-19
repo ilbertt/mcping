@@ -1,9 +1,6 @@
-import { execFile } from 'node:child_process';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
+import { $ } from 'bun';
 import { type AfterPackContext, build, type Configuration, Platform } from 'electron-builder';
-
-const execFileAsync = promisify(execFile);
 
 const LS_UI_ELEMENT = 1;
 const APP_ID = 'com.ilbertt.mcping';
@@ -16,15 +13,7 @@ const PRODUCT_NAME = 'mcping';
 // notifications — authorization is keyed to the signing identity, not the bundle id.
 const adhocSign = async (context: AfterPackContext): Promise<void> => {
   const appPath = join(context.appOutDir, `${PRODUCT_NAME}.app`);
-  await execFileAsync('codesign', [
-    '--force',
-    '--deep',
-    '--sign',
-    '-',
-    '--identifier',
-    APP_ID,
-    appPath,
-  ]);
+  await $`codesign --force --deep --sign - --identifier ${APP_ID} ${appPath}`;
 };
 
 const config: Configuration = {
