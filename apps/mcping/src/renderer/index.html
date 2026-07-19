@@ -29,8 +29,15 @@
       </section>
 
       <section class="card">
-        <h2 class="card__title">Log</h2>
-        <ol id="log" class="log"></ol>
+        <details class="log-panel">
+          <summary class="log-panel__summary">
+            <span class="card__title log-panel__title">Log</span>
+            <button id="copy-log" type="button" class="button button--ghost log-panel__copy">
+              Copy
+            </button>
+          </summary>
+          <ol id="log" class="log"></ol>
+        </details>
       </section>
     </main>
 
