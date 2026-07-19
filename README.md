@@ -9,7 +9,7 @@ mcping is a daemon that connects to one or more
 the notifications they send you.
 
 <div align="center">
-  <img src="assets/banner.png" alt="A native macOS notification sent from a demo MCP server" width="540" />
+  <img src="assets/banner.gif" alt="A native macOS notification sent from a demo MCP server" width="540" />
 </div>
 
 > [!NOTE]
