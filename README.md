@@ -10,7 +10,6 @@ mcping is a daemon that connects to one or more
 [MCP](https://modelcontextprotocol.io) servers over Streamable HTTP and surfaces
 the notifications they send you.
 
-> [!NOTE]
 > Available on macOS only, for now.
 
 ## Usage
