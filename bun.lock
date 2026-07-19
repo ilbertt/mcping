@@ -15,6 +15,17 @@
         "typescript": "catalog:",
       },
     },
+    "apps/demo": {
+      "name": "@repo/demo",
+      "dependencies": {
+        "@repo/mcping-protocol": "workspace:*",
+        "mcp-use": "catalog:",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "apps/mcping": {
       "name": "@repo/mcping",
       "version": "0.1.0",
@@ -31,17 +42,6 @@
         "electron-vite": "^5.0.0",
         "typescript": "catalog:",
         "vite": "^8.1.5",
-      },
-    },
-    "demo": {
-      "name": "@repo/demo",
-      "dependencies": {
-        "@repo/mcping-protocol": "workspace:*",
-        "mcp-use": "catalog:",
-      },
-      "devDependencies": {
-        "@repo/typescript-config": "workspace:*",
-        "typescript": "catalog:",
       },
     },
     "packages/mcping-protocol": {
@@ -450,7 +450,7 @@
 
     "@redis/time-series": ["@redis/time-series@5.10.0", "", { "peerDependencies": { "@redis/client": "^5.10.0" } }, "sha512-cPkpddXH5kc/SdRhF0YG0qtjL+noqFT0AcHbQ6axhsPsO7iqPi1cjxgdkE9TNeKiBUUdCaU1DbqkR/LzbzPBhg=="],
 
-    "@repo/demo": ["@repo/demo@workspace:demo"],
+    "@repo/demo": ["@repo/demo@workspace:apps/demo"],
 
     "@repo/mcping": ["@repo/mcping@workspace:apps/mcping"],
 

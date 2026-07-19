@@ -1,6 +1,6 @@
 # demo
 
-Ping [mcping](../apps/mcping) from your terminal. This is a tiny local MCP
+Ping [mcping](../mcping) from your terminal. This is a tiny local MCP
 server that turns whatever you type into a notification mcping shows — the whole
 loop end-to-end, without having to write your own MCP server.
 
@@ -52,7 +52,7 @@ notification with your text as the title.
 ## How it works
 
 The server and mcping share one contract —
-[`@repo/mcping-protocol`](../packages/mcping-protocol). `server.ts` builds a push
+[`@repo/mcping-protocol`](../../packages/mcping-protocol). `server.ts` builds a push
 notification with that package's `buildPushNotification` helper and sends it over
 its MCP notification channel; mcping validates the same schema with
 `parseMcpingNotification` and shows a native system notification.
