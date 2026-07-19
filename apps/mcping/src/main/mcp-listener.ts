@@ -11,6 +11,25 @@ const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30_000;
 const BACKOFF_FACTOR = 2;
 const HEALTH_CHECK_INTERVAL_MS = 5000;
+const HEALTH_CHECK_TIMEOUT_MS = 4000;
+
+// mcp-use exposes no ping helper and its raw `request` hands the SDK an
+// undefined result schema (which throws while parsing every response), so reach
+// the underlying MCP SDK client. Its `ping` is a protocol-level liveness probe
+// that every server answers regardless of the tools or resources it exposes —
+// unlike `listTools`, which a notification-only server may reject outright.
+interface PingClient {
+  ping: (options: { timeout: number }) => Promise<unknown>;
+}
+
+function getPingClient(client: MCPClient | null): PingClient | null {
+  const session = client?.getSession(SESSION_KEY);
+  if (!session) {
+    return null;
+  }
+  const connector = session.connector as unknown as { client: PingClient | null };
+  return connector.client;
+}
 
 class ServerConnection {
   private server: McpServer;
@@ -21,6 +40,7 @@ class ServerConnection {
   private backoffMs = INITIAL_BACKOFF_MS;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private healthTimer: NodeJS.Timeout | null = null;
+  private healthCheckInFlight = false;
 
   constructor(options: { server: McpServer; onStatus: (status: ConnectionStatus) => void }) {
     this.server = options.server;
@@ -89,17 +109,35 @@ class ServerConnection {
 
   private startHealthCheck(): void {
     this.stopHealthCheck();
+    this.healthCheckInFlight = false;
     this.healthTimer = setInterval(() => {
-      if (!this.client || !this.desiredConnected || this.status.state !== 'connected') {
+      void this.runHealthCheck();
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  private async runHealthCheck(): Promise<void> {
+    if (this.healthCheckInFlight || !this.desiredConnected || this.status.state !== 'connected') {
+      return;
+    }
+    const client = getPingClient(this.client);
+    if (!client) {
+      return;
+    }
+    this.healthCheckInFlight = true;
+    try {
+      await client.ping({ timeout: HEALTH_CHECK_TIMEOUT_MS });
+    } catch (error) {
+      // Bail if a disconnect/reconnect raced ahead while the ping was in flight.
+      if (!this.desiredConnected || this.status.state !== 'connected') {
         return;
       }
-      const connected = this.client.getSession(SESSION_KEY)?.connector.isClientConnected ?? false;
-      if (!connected) {
-        log({ level: 'warn', message: `[${this.server.name}] Connection lost` });
-        this.setStatus({ state: 'error', detail: 'Connection lost' });
-        void this.reconnectAfterDrop();
-      }
-    }, HEALTH_CHECK_INTERVAL_MS);
+      const detail = error instanceof Error ? error.message : String(error);
+      log({ level: 'warn', message: `[${this.server.name}] Connection lost: ${detail}` });
+      this.setStatus({ state: 'error', detail: 'Connection lost' });
+      void this.reconnectAfterDrop();
+    } finally {
+      this.healthCheckInFlight = false;
+    }
   }
 
   private async reconnectAfterDrop(): Promise<void> {
