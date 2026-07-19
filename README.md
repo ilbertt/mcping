@@ -2,15 +2,12 @@
   <img src="assets/logo.png" alt="mcping logo" width="128" />
   <h1>mcping</h1>
   <p><em>Let MCP servers ping you</em></p>
+  <img src="assets/banner.gif" alt="A native macOS notification sent from a demo MCP server" width="100%" />
 </div>
 
 mcping is a daemon that connects to one or more
 [MCP](https://modelcontextprotocol.io) servers over Streamable HTTP and surfaces
 the notifications they send you.
-
-<div align="center">
-  <img src="assets/banner.gif" alt="A native macOS notification sent from a demo MCP server" width="540" />
-</div>
 
 > [!NOTE]
 > Available on macOS only, for now.
