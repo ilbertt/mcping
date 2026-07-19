@@ -1,10 +1,10 @@
 # @repo/mcping-protocol
 
 The server → client notification contract for mcping: method-name constants,
-types, zod schemas, and builders/parsers for both sides of the wire.
+types, zod schemas, and a build/parse pair for both sides of the wire.
 
 Internal-only for now (no `pkg/`). It's written to be published later without
-rework — server authors would `buildPush`, clients `parseMcpingNotification`.
+rework — senders `buildMcpingNotification`, receivers `parseMcpingNotification`.
 
 ## The contract
 
@@ -31,14 +31,17 @@ message (the transport adds `jsonrpc`, never an `id`):
 ## Usage
 
 ```ts
-// Server: construct one, then hand it to your MCP SDK's notification API.
-import { buildPushNotification } from '@repo/mcping-protocol';
-const { method, params } = buildPushNotification({ title: 'Deploy finished' });
+// Sender: construct + validate one, then hand it to your MCP SDK's notify API.
+import { buildMcpingNotification, MCPING_METHODS } from '@repo/mcping-protocol';
+const { method, params } = buildMcpingNotification({
+  method: MCPING_METHODS.push,
+  params: { title: 'Deploy finished' },
+});
 
-// Client: parse whatever arrives on the notification channel.
-import { parseMcpingNotification } from '@repo/mcping-protocol';
+// Receiver: parse whatever arrives on the notification channel.
+import { MCPING_METHODS, parseMcpingNotification } from '@repo/mcping-protocol';
 const parsed = parseMcpingNotification(notification);
-if (parsed?.kind === 'push') showNativeNotification(parsed.params);
+if (parsed?.method === MCPING_METHODS.push) showNativeNotification(parsed.params);
 ```
 
 The zod schemas (`McpingPushParamsSchema`, `McpingPushNotificationSchema`) are
@@ -52,5 +55,7 @@ Built on [`@modelcontextprotocol/core`](https://www.npmjs.com/package/@modelcont
 
 - `bun run check:types` — type-check the package.
 
-Source layout: `methods.ts` (method names) · `push.ts` (push schema + build/parse)
-· `parse.ts` (top-level dispatcher) · `index.ts` (the only re-export barrel).
+Source layout: everything lives under `notifications/` — `methods.ts` (method
+names), `schema.ts` (the discriminated union of all kinds), `build.ts` (construct
++ validate) and `parse.ts` (validate incoming) over that union, plus one
+`schema.ts` per kind (`push/`). `index.ts` is the only re-export barrel.
