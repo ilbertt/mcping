@@ -232,6 +232,51 @@ body {
   color: var(--warn-fg);
 }
 
+.log-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-panel__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.log-panel__summary::-webkit-details-marker {
+  display: none;
+}
+
+.log-panel__summary::before {
+  content: '›';
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.log-panel[open] .log-panel__summary::before {
+  transform: rotate(90deg);
+}
+
+.log-panel__title {
+  flex: 1;
+}
+
+.log-panel__copy {
+  display: none;
+  padding: 2px 10px;
+  font-size: 11px;
+}
+
+.log-panel[open] .log-panel__copy {
+  display: inline-flex;
+}
+
 .log {
   margin: 0;
   padding: 0;
