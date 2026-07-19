@@ -27,6 +27,7 @@
     "#*": "./src/*"
   },
   "dependencies": {
+    "@repo/mcping-protocol": "workspace:*",
     "electron-store": "^11.0.2",
     "mcp-use": "catalog:"
   }

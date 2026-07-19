@@ -1,5 +1,4 @@
 import { app } from 'electron';
-import { checkAccessibility } from '#main/accessibility.ts';
 import { registerIpc } from '#main/ipc.ts';
 import { syncLoginItem } from '#main/login-item.ts';
 import { connectAutoConnectServers, shutdownAll } from '#main/mcp-listener.ts';
@@ -18,8 +17,6 @@ function onReady(): void {
   syncLoginItem(getSettings());
   registerIpc();
   createTray();
-  // Surface the system Accessibility prompt once if the permission is missing.
-  checkAccessibility({ prompt: true });
   connectAutoConnectServers();
 }
 

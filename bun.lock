@@ -19,6 +19,7 @@
       "name": "@repo/mcping",
       "version": "0.1.0",
       "dependencies": {
+        "@repo/mcping-protocol": "workspace:*",
         "electron-store": "^11.0.2",
         "mcp-use": "catalog:",
       },

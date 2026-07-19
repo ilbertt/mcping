@@ -29,21 +29,6 @@
       </section>
 
       <section class="card">
-        <div class="card__row">
-          <h2 class="card__title">Accessibility</h2>
-          <span id="accessibility-pill" class="pill">Checking…</span>
-        </div>
-        <p class="card__hint">
-          Driving Claude Desktop needs the macOS Accessibility permission. After granting it,
-          restart mcping.
-        </p>
-        <div class="card__actions">
-          <button id="accessibility-open" type="button" class="button">Open Accessibility settings</button>
-          <button id="accessibility-recheck" type="button" class="button button--ghost">Re-check</button>
-        </div>
-      </section>
-
-      <section class="card">
         <h2 class="card__title">Log</h2>
         <ol id="log" class="log"></ol>
       </section>
@@ -69,18 +54,9 @@
           <input type="checkbox" data-field="autoConnect" />
           <span class="field__label">Connect automatically on launch</span>
         </label>
-        <label class="field field--switch">
-          <input type="checkbox" data-field="requireApproval" />
-          <span class="field__label">Ask for approval before each action (click the notification to run)</span>
-        </label>
-        <label class="field field--switch">
-          <input type="checkbox" data-field="autoSend" />
-          <span class="field__label">Send the prompt automatically (otherwise pre-fill only)</span>
-        </label>
         <div class="card__actions">
           <button type="button" class="button" data-action="connect">Connect</button>
           <button type="button" class="button button--ghost" data-action="disconnect">Disconnect</button>
-          <button type="button" class="button button--ghost" data-action="test">Run test action</button>
           <button type="button" class="button button--danger" data-action="remove">Remove</button>
         </div>
         </div>

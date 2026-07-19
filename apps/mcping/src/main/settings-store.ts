@@ -9,20 +9,10 @@ let store: Store<Settings> | null = null;
 interface LegacySettings {
   serverUrl?: string;
   notificationMethod?: string;
-  requireApproval?: boolean;
-  autoSend?: boolean;
-  claudeAppName?: string;
   autoConnect?: boolean;
 }
 
-const LEGACY_KEYS: (keyof LegacySettings)[] = [
-  'serverUrl',
-  'notificationMethod',
-  'requireApproval',
-  'autoSend',
-  'claudeAppName',
-  'autoConnect',
-];
+const LEGACY_KEYS: (keyof LegacySettings)[] = ['serverUrl', 'notificationMethod', 'autoConnect'];
 
 function migrateLegacy(target: Store<Settings>): void {
   const legacy = target.store as unknown as LegacySettings;
@@ -36,8 +26,6 @@ function migrateLegacy(target: Store<Settings>): void {
     name: DEFAULT_SERVER.name,
     url: legacy.serverUrl,
     autoConnect: legacy.autoConnect ?? DEFAULT_SERVER.autoConnect,
-    requireApproval: legacy.requireApproval ?? DEFAULT_SERVER.requireApproval,
-    autoSend: legacy.autoSend ?? DEFAULT_SERVER.autoSend,
   };
   target.set('servers', [migrated]);
   for (const key of LEGACY_KEYS) {

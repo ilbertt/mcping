@@ -1,6 +1,5 @@
 import './styles.css';
 import type {
-  AccessibilityStatus,
   ConnectionState,
   ConnectionStatus,
   LogEntry,
@@ -12,9 +11,6 @@ import type {
 import { DEFAULT_SERVER } from '#shared/types.ts';
 
 const api = window.mcping;
-
-const ACCESSIBILITY_GRANTED = 'Granted';
-const ACCESSIBILITY_MISSING = 'Not granted';
 
 const STATUS_LABEL: Record<ConnectionState, string> = {
   disconnected: 'Disconnected',
@@ -70,9 +66,6 @@ function wireCardActions(options: { card: HTMLElement; id: string }): void {
   });
   actionButton({ card, action: 'disconnect' }).addEventListener('click', () => {
     void api.disconnect(id);
-  });
-  actionButton({ card, action: 'test' }).addEventListener('click', () => {
-    void api.runTestAction(id);
   });
   actionButton({ card, action: 'remove' }).addEventListener('click', () => {
     void removeServer(id);
@@ -163,26 +156,6 @@ function wireGlobalSettings(): void {
   }
 }
 
-function renderAccessibility(status: AccessibilityStatus): void {
-  const pill = requireElement<HTMLElement>('#accessibility-pill');
-  pill.textContent = status.trusted ? ACCESSIBILITY_GRANTED : ACCESSIBILITY_MISSING;
-  pill.classList.toggle('pill--ok', status.trusted);
-  pill.classList.toggle('pill--warn', !status.trusted);
-}
-
-async function refreshAccessibility(): Promise<void> {
-  renderAccessibility(await api.checkAccessibility());
-}
-
-function wireAccessibility(): void {
-  requireElement<HTMLButtonElement>('#accessibility-open').addEventListener('click', () => {
-    void api.openAccessibilitySettings();
-  });
-  requireElement<HTMLButtonElement>('#accessibility-recheck').addEventListener('click', () => {
-    void refreshAccessibility();
-  });
-}
-
 function renderLogEntry(entry: LogEntry): void {
   const list = requireElement<HTMLOListElement>('#log');
   const item = document.createElement('li');
@@ -215,9 +188,6 @@ async function init(): Promise<void> {
       updateCardStatus({ card, status: entry.status });
     }
   });
-
-  wireAccessibility();
-  await refreshAccessibility();
 
   for (const entry of await api.getLog()) {
     renderLogEntry(entry);

@@ -1,13 +1,10 @@
 import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
-import { checkAccessibility, openAccessibilitySettings } from '#main/accessibility.ts';
 import { getLog } from '#main/logger.ts';
 import { syncLoginItem } from '#main/login-item.ts';
 import { connectServer, disconnectServer, getStatuses, syncServers } from '#main/mcp-listener.ts';
-import { runTestAction } from '#main/notification-handler.ts';
 import {
   addServer,
-  getServer,
   getSettings,
   removeServer,
   updateServer,
@@ -57,16 +54,5 @@ export function registerIpc(): void {
   handle<string, void>({ channel: IPC.mcpConnect, handler: (id) => connectServer(id) });
   handle<string, void>({ channel: IPC.mcpDisconnect, handler: (id) => disconnectServer(id) });
   handle({ channel: IPC.mcpGetStatuses, handler: () => getStatuses() });
-  handle<string, void>({
-    channel: IPC.mcpTestAction,
-    handler: async (id) => {
-      const server = getServer(id);
-      if (server) {
-        await runTestAction(server);
-      }
-    },
-  });
-  handle({ channel: IPC.accessibilityCheck, handler: () => checkAccessibility() });
-  handle({ channel: IPC.accessibilityOpenSettings, handler: () => openAccessibilitySettings() });
   handle({ channel: IPC.logGet, handler: () => getLog() });
 }
