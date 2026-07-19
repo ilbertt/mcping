@@ -112,10 +112,11 @@ function updateCardStatus(options: { card: HTMLElement; status: ConnectionStatus
   requireChild<HTMLElement>({ root: card, selector: '[data-role="detail"]' }).textContent =
     status.detail ?? '';
 
-  const isBusy = status.state === 'connecting';
-  const isConnected = status.state === 'connected';
-  actionButton({ card, action: 'connect' }).disabled = isConnected || isBusy;
-  actionButton({ card, action: 'disconnect' }).disabled = !(isConnected || isBusy);
+  // Connect is pointless while connected or mid-connect; Disconnect is pointless
+  // while fully disconnected. The error state keeps both: retry now, or give up.
+  actionButton({ card, action: 'connect' }).hidden =
+    status.state === 'connected' || status.state === 'connecting';
+  actionButton({ card, action: 'disconnect' }).hidden = status.state === 'disconnected';
 }
 
 function applyStatuses(statuses: ServerStatus[]): void {
