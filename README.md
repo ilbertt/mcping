@@ -1,8 +1,11 @@
 <div align="center">
   <img src="assets/banner.gif" alt="A native macOS notification sent from a demo MCP server" width="100%" />
-  <h1>
-    <img src="assets/logo.png" alt="mcping logo" height="36" align="middle" />&nbsp;mcping
-  </h1>
+  <table align="center" border="0">
+    <tr>
+      <td valign="middle"><img src="assets/logo.png" alt="mcping logo" height="44" /></td>
+      <td valign="middle"><h1>mcping</h1></td>
+    </tr>
+  </table>
   <p><em>Let MCP servers ping you</em></p>
 </div>
 
