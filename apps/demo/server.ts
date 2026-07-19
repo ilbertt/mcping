@@ -49,7 +49,7 @@ for await (const line of console) {
   }
   const { method, params } = buildMcpingNotification({
     method: MCPING_METHODS.push,
-    params: { title: text },
+    params: { title: text, body: 'Sent from demo mcp server' },
   });
   await server.sendNotification(method, params);
   console.log(`→ pinged ${clients} client${clients === 1 ? '' : 's'}: ${text}`);
