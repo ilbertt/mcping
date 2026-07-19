@@ -1,4 +1,4 @@
-import { buildPushNotification } from '@repo/mcping-protocol';
+import { buildMcpingNotification, MCPING_METHODS } from '@repo/mcping-protocol';
 import { createMCPServer } from 'mcp-use/server';
 
 // Production mode skips mcp-use's dev widget toolchain (Vite/React/Tailwind), unused here.
@@ -47,7 +47,10 @@ for await (const line of console) {
     console.log('No mcping client connected yet — is the app running with its server enabled?');
     continue;
   }
-  const { method, params } = buildPushNotification({ title: text });
+  const { method, params } = buildMcpingNotification({
+    method: MCPING_METHODS.push,
+    params: { title: text },
+  });
   await server.sendNotification(method, params);
   console.log(`→ pinged ${clients} client${clients === 1 ? '' : 's'}: ${text}`);
 }
