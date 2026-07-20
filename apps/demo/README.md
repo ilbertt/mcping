@@ -36,6 +36,25 @@ It listens on `http://127.0.0.1:3050/mcp`. mcping connects within a second — w
 its menu-bar **MCP servers** submenu turn *connected* (it also retries with
 backoff, so starting the server before or after the app both work).
 
+### Requiring authentication (optional)
+
+By default the server is open. Pass `--auth` to make it require credentials — a
+quick way to exercise mcping's auth flows end-to-end:
+
+```sh
+bun run --filter @repo/demo server --auth apikey   # random API key
+bun run --filter @repo/demo server --auth oauth    # local OAuth server
+```
+
+- **`apikey`** prints a random key (a `crypto.randomUUID()`) on startup. In
+  mcping, open the server's auth settings, pick **Bearer token** or the
+  **X-API-Key** header, and paste the key — the server accepts it either way.
+- **`oauth`** starts a throwaway local authorization server on
+  `http://127.0.0.1:3051`. In mcping, set the auth type to **OAuth** and click
+  **Connect**; your browser opens briefly to complete authorization and the token
+  flows back automatically. It verifies nothing and protects nothing — it exists
+  only to drive mcping's OAuth path locally.
+
 ## 3. Ping yourself
 
 Type a message and press Enter (the first line is what you type, the second is
@@ -52,9 +71,9 @@ notification with your text as the title.
 ## How it works
 
 The server and mcping share one contract —
-[`@repo/mcping-protocol`](../../packages/mcping-protocol). `server.ts` builds a push
-notification with that package's `buildPushNotification` helper and sends it over
-its MCP notification channel; mcping validates the same schema with
+[`@repo/mcping-protocol`](../../packages/mcping-protocol). `src/server.ts` builds a
+push notification with that package's `buildPushNotification` helper and sends it
+over its MCP notification channel; mcping validates the same schema with
 `parseMcpingNotification` and shows a native system notification.
 
 The wire message (the transport adds `jsonrpc`):
@@ -69,4 +88,4 @@ The wire message (the transport adds `jsonrpc`):
 
 `push` is presentational. Alongside `title` it also carries an optional `body`,
 `subtitle`, `priority` (`low` | `normal` | `critical`), and `silent` — the demo
-sends only the title; see [`server.ts`](./server.ts) to send the rest.
+sends only the title; see [`src/server.ts`](./src/server.ts) to send the rest.
