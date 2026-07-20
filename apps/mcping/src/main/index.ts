@@ -18,6 +18,11 @@ function onReady(): void {
   registerIpc();
   createTray();
   connectAutoConnectServers();
+  // A fresh install has no servers to connect to: open Settings so the user can
+  // add their first MCP server. Debug builds seed the demo server and skip this.
+  if (getSettings().servers.length === 0) {
+    showSettingsWindow();
+  }
 }
 
 function onFatal(error: unknown): void {
