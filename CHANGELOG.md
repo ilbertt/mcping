@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.7.20-2] - 2026-07-20
+
+### 🚀 Features
+
+- *(mcping)* Support authenticated MCP servers (#15)
+- *(mcping)* Open Settings on first launch, drop default localhost server (#16)
+
+### 🚜 Refactor
+
+- *(mcping)* Use placeholders for new-server fields (#18)
+- *(mcping)* Restructure src into domain modules and folders (#17)
+
+### ⚙️ Miscellaneous Tasks
+
+- Show build-provenance notice in release body (#14)
+
 ## [2026.7.20-1] - 2026-07-20
 
 ### 🚀 Features
