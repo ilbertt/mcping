@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [2026.7.20-3] - 2026-07-20
+
+### 🚀 Features
+
+- *(demo)* Add optional --auth apikey|oauth modes (#22)
+
+### 🐛 Bug Fixes
+
+- *(mcping)* Stop reconnecting on terminal auth/404 errors (#26)
+- *(demo)* Announce "Client disconnected" when a session drops (#25)
+- *(demo)* Friendlier server console output (#24)
+- *(mcping)* Simplify server auth options in settings UI (#23)
+- *(mcping)* Server card UI — auth fields and Connect/Disconnect visibility (#21)
+- *(mcping)* Use full-bleed app icon so macOS stops framing it in gray (#20)
+
 ## [2026.7.20-2] - 2026-07-20
 
 ### 🚀 Features
