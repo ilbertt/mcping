@@ -84,11 +84,13 @@ export function updateCardStatus(options: { card: HTMLElement; status: Connectio
   requireChild<HTMLElement>({ root: card, selector: '[data-role="detail"]' }).textContent =
     status.detail ?? '';
 
-  // Connect is pointless while connected or mid-connect; Disconnect is pointless
-  // while fully disconnected. The error state keeps both: retry now, or give up.
-  actionButton({ card, action: 'connect' }).hidden =
-    status.state === 'connected' || status.state === 'connecting';
-  actionButton({ card, action: 'disconnect' }).hidden = status.state === 'disconnected';
+  // Exactly one button shows — the one for the opposite of the current state.
+  // Connect while not connected (disconnected or error → connect/retry),
+  // Disconnect while connected or mid-connect (so a hanging connect can be
+  // cancelled).
+  const active = status.state === 'connected' || status.state === 'connecting';
+  actionButton({ card, action: 'connect' }).hidden = active;
+  actionButton({ card, action: 'disconnect' }).hidden = !active;
 }
 
 function applyStatuses(statuses: ServerStatus[]): void {
