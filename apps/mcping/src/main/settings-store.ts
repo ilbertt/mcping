@@ -1,8 +1,19 @@
+import { app } from 'electron';
 import Store from 'electron-store';
 import type { McpServer, ServerDraft, Settings } from '#shared/types.ts';
 import { DEFAULT_SERVER, DEFAULT_SETTINGS } from '#shared/types.ts';
 
 let store: Store<Settings> | null = null;
+
+// A released install starts with no servers so the user adds their first one
+// from Settings. Debug builds preload the local demo server (127.0.0.1:3050) so
+// development needs no manual setup.
+function storeDefaults(): Settings {
+  if (app.isPackaged) {
+    return DEFAULT_SETTINGS;
+  }
+  return { ...DEFAULT_SETTINGS, servers: [{ id: 'default', ...DEFAULT_SERVER }] };
+}
 
 // Fields from the pre-multi-server flat settings shape. Kept only to migrate an
 // existing single-server config into the `servers` list on first launch.
@@ -35,7 +46,7 @@ function migrateLegacy(target: Store<Settings>): void {
 
 function requireStore(): Store<Settings> {
   if (!store) {
-    store = new Store<Settings>({ defaults: DEFAULT_SETTINGS });
+    store = new Store<Settings>({ defaults: storeDefaults() });
     migrateLegacy(store);
   }
   return store;
