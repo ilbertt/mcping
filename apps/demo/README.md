@@ -57,12 +57,11 @@ bun run --filter @repo/demo server --auth oauth    # local OAuth server
 
 ## 3. Ping yourself
 
-Type a message and press Enter (the first line is what you type, the second is
-the server's confirmation):
+At the `> ` prompt, type a message and press Enter:
 
 ```
-Deploy finished — take a look
-→ pinged 1 client: Deploy finished — take a look
+> Deploy finished — take a look
+>
 ```
 
 Each line becomes a **push** notification; mcping shows it as a native system
