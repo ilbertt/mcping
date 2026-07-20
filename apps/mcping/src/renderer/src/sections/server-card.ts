@@ -12,7 +12,19 @@ const STATUS_LABEL: Record<ConnectionState, string> = {
   error: 'Error',
 };
 
-export function findCard(serverId: string): HTMLElement | null {
+// Set while a just-added server is still blank; blocks a second add until it
+// connects or is removed.
+let pendingServerId: string | null = null;
+
+function addButton(): HTMLButtonElement {
+  return requireElement<HTMLButtonElement>('#add-server');
+}
+
+function syncAddButton(): void {
+  addButton().disabled = pendingServerId !== null;
+}
+
+function findCard(serverId: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`.server[data-server-id="${serverId}"]`);
 }
 
@@ -28,7 +40,11 @@ async function saveField(options: { id: string; input: HTMLInputElement }): Prom
 
 async function removeServer(id: string): Promise<void> {
   await api.removeServer(id);
+  if (id === pendingServerId) {
+    pendingServerId = null;
+  }
   await renderServers();
+  syncAddButton();
 }
 
 function wireCardActions(options: { card: HTMLElement; id: string }): void {
@@ -75,7 +91,7 @@ function buildServerCard(options: { server: McpServer; authState: ServerAuthStat
   return card;
 }
 
-export function updateCardStatus(options: { card: HTMLElement; status: ConnectionStatus }): void {
+function updateCardStatus(options: { card: HTMLElement; status: ConnectionStatus }): void {
   const { card, status } = options;
   const pill = requireChild<HTMLElement>({ root: card, selector: '[data-role="status"]' });
   pill.textContent = STATUS_LABEL[status.state];
@@ -93,12 +109,20 @@ export function updateCardStatus(options: { card: HTMLElement; status: Connectio
   actionButton({ card, action: 'disconnect' }).hidden = !active;
 }
 
+export function applyServerStatus(entry: ServerStatus): void {
+  const card = findCard(entry.serverId);
+  if (card) {
+    updateCardStatus({ card, status: entry.status });
+  }
+  if (entry.serverId === pendingServerId && entry.status.state === 'connected') {
+    pendingServerId = null;
+    syncAddButton();
+  }
+}
+
 function applyStatuses(statuses: ServerStatus[]): void {
   for (const entry of statuses) {
-    const card = findCard(entry.serverId);
-    if (card) {
-      updateCardStatus({ card, status: entry.status });
-    }
+    applyServerStatus(entry);
   }
 }
 
@@ -110,10 +134,28 @@ export async function renderServers(): Promise<void> {
       buildServerCard({ server, authState: authStates[server.id] ?? EMPTY_AUTH_STATE }),
     ),
   );
+  const pendingCard = pendingServerId ? findCard(pendingServerId) : null;
+  if (pendingCard instanceof HTMLDetailsElement) {
+    pendingCard.open = true;
+  }
   applyStatuses(await api.getStatuses());
 }
 
-export async function addServer(): Promise<void> {
-  await api.addServer({ name: '', url: '', autoConnect: true, auth: { type: 'none' } });
+async function addServer(): Promise<void> {
+  const settings = await api.addServer({
+    name: '',
+    url: '',
+    autoConnect: true,
+    auth: { type: 'none' },
+  });
+  pendingServerId = settings.servers.at(-1)?.id ?? null;
   await renderServers();
+  syncAddButton();
+}
+
+export function wireAddServer(): void {
+  addButton().addEventListener('click', () => {
+    void addServer();
+  });
+  syncAddButton();
 }

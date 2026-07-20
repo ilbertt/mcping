@@ -174,10 +174,22 @@ body {
   color: var(--warn-fg);
 }
 
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .servers {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* An empty list is still a flex child, so its card's row-gap would sit below the
+   header and inflate the bottom padding. Drop it until it has entries. */
+.servers:empty,
+.log:empty {
+  display: none;
 }
 
 .server {
