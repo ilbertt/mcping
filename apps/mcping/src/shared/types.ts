@@ -34,8 +34,9 @@ export interface Settings {
   launchAtLogin: boolean;
 }
 
-// Per-server defaults, reused as the seed for a fresh install and as the
-// template when the user adds a server.
+// Per-server defaults: the template when the user adds a server, and the seed
+// that debug builds preload (the local demo server) so development needs no
+// manual setup. A released install starts with no servers — see settings-store.
 // 127.0.0.1 (not localhost) avoids IPv4/IPv6 ambiguity on the default host.
 export const DEFAULT_SERVER: Omit<McpServer, 'id'> = {
   name: 'My server',
@@ -45,7 +46,7 @@ export const DEFAULT_SERVER: Omit<McpServer, 'id'> = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  servers: [{ id: 'default', ...DEFAULT_SERVER }],
+  servers: [],
   launchAtLogin: false,
 };
 
