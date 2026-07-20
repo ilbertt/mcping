@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "description": "Local MCP server that pings mcping from your terminal",
+  "imports": {
+    "#*": "./src/*"
+  },
   "scripts": {
-    "server": "bun run ./server.ts",
+    "server": "bun run ./src/server.ts",
     "check:types": "bun run --bun tsc"
   },
   "devDependencies": {
