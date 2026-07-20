@@ -47,10 +47,7 @@ function serverFormComplete(card: HTMLElement): boolean {
     selector: '[data-auth="type"]',
   }).value;
   if (authType === 'header') {
-    return (
-      Boolean(trimmedValue({ card, selector: '[data-auth="header-name"]' })) &&
-      card.dataset.secretSet === 'true'
-    );
+    return card.dataset.secretSet === 'true';
   }
   return true;
 }

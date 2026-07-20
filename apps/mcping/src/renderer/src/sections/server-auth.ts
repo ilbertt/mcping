@@ -100,25 +100,19 @@ export function wireAuth(options: {
 
   select.addEventListener('change', () => {
     const type = select.value as ServerAuthType;
-    if (type === 'header' && !headerName.value.trim()) {
-      headerName.value = DEFAULT_HEADER_NAME;
-    }
     applyAuthVisibility({ card, type });
     onChange();
-    void saveAuth({ card, id: server.id, type, headerName: headerName.value }).then(onChange);
+    void saveAuth({ card, id: server.id, type, headerName: headerName.value });
   });
-  headerName.addEventListener('input', onChange);
   headerName.addEventListener('change', () => {
     if (select.value === 'header') {
-      void saveAuth({ card, id: server.id, type: 'header', headerName: headerName.value }).then(
-        onChange,
-      );
+      void saveAuth({ card, id: server.id, type: 'header', headerName: headerName.value });
     }
   });
   secret.addEventListener('change', () => {
     void saveSecret({ card, id: server.id, input: secret }).then(onChange);
   });
   actionButton({ card, action: 'sign-out' }).addEventListener('click', () => {
-    void handleSignOut({ card, id: server.id }).then(onChange);
+    void handleSignOut({ card, id: server.id });
   });
 }
