@@ -40,13 +40,6 @@ function buildServerConfig(options: {
   const { server, oauthProvider } = options;
   const config: HttpServerConfig = { url: server.url };
   switch (server.auth.type) {
-    case 'bearer': {
-      const token = secretStore.get(server.id);
-      if (token) {
-        config.authToken = token;
-      }
-      break;
-    }
     case 'header': {
       const value = secretStore.get(server.id);
       if (value) {
