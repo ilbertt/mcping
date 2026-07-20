@@ -134,6 +134,24 @@ body {
   outline-offset: -1px;
 }
 
+.field__select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.auth-secret {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-secret .field__input {
+  flex: 1;
+}
+
+.auth-signout {
+  align-self: flex-start;
+}
+
 .button {
   padding: 6px 12px;
   border: 1px solid var(--accent);

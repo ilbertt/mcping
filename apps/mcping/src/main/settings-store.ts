@@ -15,39 +15,9 @@ function storeDefaults(): Settings {
   return { ...DEFAULT_SETTINGS, servers: [{ id: 'default', ...DEFAULT_SERVER }] };
 }
 
-// Fields from the pre-multi-server flat settings shape. Kept only to migrate an
-// existing single-server config into the `servers` list on first launch.
-interface LegacySettings {
-  serverUrl?: string;
-  notificationMethod?: string;
-  autoConnect?: boolean;
-}
-
-const LEGACY_KEYS: (keyof LegacySettings)[] = ['serverUrl', 'notificationMethod', 'autoConnect'];
-
-function migrateLegacy(target: Store<Settings>): void {
-  const legacy = target.store as unknown as LegacySettings;
-  // Guard on `serverUrl` rather than `servers`: defaults always backfill
-  // `servers`, so its presence can't distinguish a legacy store.
-  if (legacy.serverUrl === undefined) {
-    return;
-  }
-  const migrated: McpServer = {
-    id: 'default',
-    name: DEFAULT_SERVER.name,
-    url: legacy.serverUrl,
-    autoConnect: legacy.autoConnect ?? DEFAULT_SERVER.autoConnect,
-  };
-  target.set('servers', [migrated]);
-  for (const key of LEGACY_KEYS) {
-    target.delete(key as keyof Settings);
-  }
-}
-
 function requireStore(): Store<Settings> {
   if (!store) {
     store = new Store<Settings>({ defaults: storeDefaults() });
-    migrateLegacy(store);
   }
   return store;
 }
