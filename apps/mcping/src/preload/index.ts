@@ -1,7 +1,9 @@
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
-import type { LogEntry, McpingApi, ServerStatus } from '#shared/types.ts';
-import { IPC } from '#shared/types.ts';
+import type { McpingApi } from '#shared/api.ts';
+import type { ServerStatus } from '#shared/connection.ts';
+import { IPC } from '#shared/ipc.ts';
+import type { LogEntry } from '#shared/log.ts';
 
 function subscribe<T>(options: { channel: string; listener: (payload: T) => void }): () => void {
   const handler = (...eventArgs: [IpcRendererEvent, T]): void => {

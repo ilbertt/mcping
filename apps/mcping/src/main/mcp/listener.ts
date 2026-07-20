@@ -2,12 +2,14 @@ import { shell } from 'electron';
 import type { NodeOAuthClientProvider } from 'mcp-use/auth/node';
 import { MCPClient } from 'mcp-use/client';
 import { completeAuthorization, createOauthProvider } from '#main/auth/oauth.ts';
-import { secretStore } from '#main/auth/secret-store.ts';
-import { log } from '#main/logger.ts';
-import { handleNotification } from '#main/notification-handler.ts';
-import { sendStatus } from '#main/renderer-events.ts';
-import { getSettings } from '#main/settings-store.ts';
-import type { ConnectionStatus, McpServer, ServerAuth, ServerStatus } from '#shared/types.ts';
+import { handleNotification } from '#main/mcp/notification-handler.ts';
+import { secretStore } from '#main/stores/secret-store.ts';
+import { getSettings } from '#main/stores/settings-store.ts';
+import { log } from '#main/system/logger.ts';
+import { sendStatus } from '#main/ui/renderer-events.ts';
+import type { ServerAuth } from '#shared/auth.ts';
+import type { ConnectionStatus, ServerStatus } from '#shared/connection.ts';
+import type { McpServer } from '#shared/server.ts';
 
 const SESSION_KEY = 'server';
 const MS_PER_SECOND = 1000;
@@ -28,10 +30,9 @@ interface HttpServerConfig {
   authProvider?: NodeOAuthClientProvider;
 }
 
-// Translate a server's auth mode into the credential fields mcp-use forwards to
-// the transport: a bearer header, a custom header, or the OAuth provider that
-// drives the browser flow. Secrets are read from the keychain-backed store here
-// and never live in the persisted server config.
+// Map a server's auth mode onto the credential fields mcp-use forwards to the
+// transport. Secrets are read from the keychain-backed store here and never live
+// in the persisted server config.
 function buildServerConfig(options: {
   server: McpServer;
   oauthProvider: NodeOAuthClientProvider | null;
@@ -434,7 +435,7 @@ export async function disconnectServer(serverId: string): Promise<void> {
 }
 
 // A credential changed under a live connection: reconnect so the new secret
-// takes effect. No-op when the server isn't meant to be connected.
+// takes effect.
 export function reconnectIfActive(serverId: string): void {
   const connection = connections.get(serverId);
   if (connection?.isActive()) {

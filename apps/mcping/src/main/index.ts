@@ -1,11 +1,11 @@
 import { app } from 'electron';
 import { registerIpc } from '#main/ipc.ts';
-import { syncLoginItem } from '#main/login-item.ts';
-import { connectAutoConnectServers, shutdownAll } from '#main/mcp-listener.ts';
-import { getSettings } from '#main/settings-store.ts';
-import { showSettingsWindow } from '#main/settings-window.ts';
-import { createTray } from '#main/tray.ts';
-import { APP_NAME } from '#shared/types.ts';
+import { connectAutoConnectServers, shutdownAll } from '#main/mcp/listener.ts';
+import { getSettings } from '#main/stores/settings-store.ts';
+import { syncLoginItem } from '#main/system/login-item.ts';
+import { showSettingsWindow } from '#main/ui/settings-window.ts';
+import { createTray } from '#main/ui/tray.ts';
+import { APP_NAME } from '#shared/app.ts';
 
 const QUIT_TEARDOWN_TIMEOUT_MS = 2000;
 

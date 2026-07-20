@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
-import { APP_NAME } from '#shared/types.ts';
+import { APP_NAME } from '#shared/app.ts';
 
 const WINDOW_WIDTH = 460;
 const WINDOW_HEIGHT = 640;

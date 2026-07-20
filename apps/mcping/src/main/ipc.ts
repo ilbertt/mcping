@@ -1,16 +1,14 @@
 import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 import { clearOauth, hasOauthTokens } from '#main/auth/oauth.ts';
-import { secretStore } from '#main/auth/secret-store.ts';
-import { getLog } from '#main/logger.ts';
-import { syncLoginItem } from '#main/login-item.ts';
 import {
   connectServer,
   disconnectServer,
   getStatuses,
   reconnectIfActive,
   syncServers,
-} from '#main/mcp-listener.ts';
+} from '#main/mcp/listener.ts';
+import { secretStore } from '#main/stores/secret-store.ts';
 import {
   addServer,
   getServer,
@@ -18,10 +16,14 @@ import {
   removeServer,
   updateServer,
   updateSettings,
-} from '#main/settings-store.ts';
-import { refreshTray } from '#main/tray.ts';
-import type { ServerAuth, ServerAuthState, ServerDraft, Settings } from '#shared/types.ts';
-import { IPC } from '#shared/types.ts';
+} from '#main/stores/settings-store.ts';
+import { getLog } from '#main/system/logger.ts';
+import { syncLoginItem } from '#main/system/login-item.ts';
+import { refreshTray } from '#main/ui/tray.ts';
+import type { ServerAuth, ServerAuthState } from '#shared/auth.ts';
+import { IPC } from '#shared/ipc.ts';
+import type { ServerDraft } from '#shared/server.ts';
+import type { Settings } from '#shared/settings.ts';
 
 function handle<Req, Res>(options: {
   channel: string;
@@ -30,8 +32,6 @@ function handle<Req, Res>(options: {
   ipcMain.handle(options.channel, (...args: [IpcMainInvokeEvent, Req]) => options.handler(args[1]));
 }
 
-// After the server list changes: reconcile live connections and rebuild the tray
-// so both track the new configuration.
 function applyServerChange(next: Settings): Settings {
   syncServers();
   refreshTray();

@@ -1,0 +1,16 @@
+export const IPC = {
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  serversAdd: 'servers:add',
+  serversUpdate: 'servers:update',
+  serversRemove: 'servers:remove',
+  serverSecretSet: 'server:secret-set',
+  authGetStates: 'auth:get-states',
+  authSignOut: 'auth:sign-out',
+  mcpConnect: 'mcp:connect',
+  mcpDisconnect: 'mcp:disconnect',
+  mcpGetStatuses: 'mcp:get-statuses',
+  mcpStatus: 'mcp:status',
+  logGet: 'log:get',
+  logEntry: 'log:entry',
+} as const;

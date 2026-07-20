@@ -5,12 +5,12 @@ import {
   disconnectServer,
   getStatuses,
   onStatusChange,
-} from '#main/mcp-listener.ts';
-import { getSettings } from '#main/settings-store.ts';
-import { showSettingsWindow } from '#main/settings-window.ts';
-import { createTrayIcon } from '#main/tray-icon.ts';
-import type { ConnectionState } from '#shared/types.ts';
-import { APP_NAME } from '#shared/types.ts';
+} from '#main/mcp/listener.ts';
+import { getSettings } from '#main/stores/settings-store.ts';
+import { showSettingsWindow } from '#main/ui/settings-window.ts';
+import { createTrayIcon } from '#main/ui/tray-icon.ts';
+import { APP_NAME } from '#shared/app.ts';
+import type { ConnectionState } from '#shared/connection.ts';
 
 let tray: Tray | null = null;
 

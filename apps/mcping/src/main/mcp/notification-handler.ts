@@ -5,11 +5,10 @@ import {
 } from '@repo/mcping-protocol';
 import { Notification as DesktopNotification } from 'electron';
 import type { Notification } from 'mcp-use/client';
-import { log } from '#main/logger.ts';
-import type { McpServer } from '#shared/types.ts';
+import { log } from '#main/system/logger.ts';
+import type { McpServer } from '#shared/server.ts';
 
-// A push notification is presentational: map its params onto a native system
-// notification. `priority` is named to match Electron's `urgency` values.
+// `priority` is named to match Electron's `urgency` values.
 function showPushNotification(options: { server: McpServer; params: McpingPushParams }): void {
   const { server, params } = options;
   if (!DesktopNotification.isSupported()) {
