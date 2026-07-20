@@ -1,7 +1,6 @@
 import type { ServerAuthState } from '#shared/auth.ts';
 import type { ConnectionState, ConnectionStatus, ServerStatus } from '#shared/connection.ts';
 import type { McpServer, ServerDraft } from '#shared/server.ts';
-import { DEFAULT_SERVER } from '#shared/server.ts';
 import { api } from '../lib/api.ts';
 import { actionButton, requireChild, requireElement } from '../lib/dom.ts';
 import { EMPTY_AUTH_STATE, wireAuth } from './server-auth.ts';
@@ -54,7 +53,7 @@ function buildServerCard(options: { server: McpServer; authState: ServerAuthStat
   });
   card.dataset.serverId = server.id;
   const title = requireChild<HTMLElement>({ root: card, selector: '[data-role="title"]' });
-  title.textContent = server.name;
+  title.textContent = server.name.trim() || 'Untitled server';
   for (const input of card.querySelectorAll<HTMLInputElement>('[data-field]')) {
     const value = server[input.dataset.field as keyof ServerDraft];
     if (typeof value === 'boolean') {
@@ -113,6 +112,6 @@ export async function renderServers(): Promise<void> {
 }
 
 export async function addServer(): Promise<void> {
-  await api.addServer({ ...DEFAULT_SERVER, name: 'New server' });
+  await api.addServer({ name: '', url: '', autoConnect: true, auth: { type: 'none' } });
   await renderServers();
 }

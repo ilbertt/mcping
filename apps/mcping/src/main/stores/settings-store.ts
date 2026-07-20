@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import Store from 'electron-store';
 import type { McpServer, ServerDraft } from '#shared/server.ts';
-import { DEFAULT_SERVER } from '#shared/server.ts';
+import { DEMO_SERVER } from '#shared/server.ts';
 import type { Settings } from '#shared/settings.ts';
 import { DEFAULT_SETTINGS } from '#shared/settings.ts';
 
@@ -14,7 +14,7 @@ function storeDefaults(): Settings {
   if (app.isPackaged) {
     return DEFAULT_SETTINGS;
   }
-  return { ...DEFAULT_SETTINGS, servers: [{ id: 'default', ...DEFAULT_SERVER }] };
+  return { ...DEFAULT_SETTINGS, servers: [{ id: 'default', ...DEMO_SERVER }] };
 }
 
 function requireStore(): Store<Settings> {
