@@ -56,20 +56,26 @@ process.stdout.write(
 );
 
 // mcp-use exposes no connection event, so poll the active sessions and announce
-// any session id we haven't seen before.
+// any session id that appears or disappears since the last poll.
 const CLIENT_POLL_INTERVAL_MS = 1000;
 let knownSessions = new Set<string>();
 setInterval(() => {
-  const current = server.getActiveSessions();
-  let connected = false;
+  const current = new Set(server.getActiveSessions());
+  let changed = false;
   for (const sessionId of current) {
     if (!knownSessions.has(sessionId)) {
       process.stdout.write(`\nClient connected (${authLabel})!`);
-      connected = true;
+      changed = true;
     }
   }
-  knownSessions = new Set(current);
-  if (connected) {
+  for (const sessionId of knownSessions) {
+    if (!current.has(sessionId)) {
+      process.stdout.write('\nClient disconnected.');
+      changed = true;
+    }
+  }
+  knownSessions = current;
+  if (changed) {
     process.stdout.write('\n> ');
   }
 }, CLIENT_POLL_INTERVAL_MS);
