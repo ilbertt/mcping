@@ -19,6 +19,7 @@ const BACKOFF_FACTOR = 2;
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 const HEALTH_CHECK_TIMEOUT_MS = 4000;
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_NOT_FOUND = 404;
 
 const AUTH_REQUIRED_DETAIL = 'Authorization required — click Connect';
 const AWAITING_AUTH_DETAIL = 'Waiting for browser authorization…';
@@ -80,6 +81,22 @@ function isAuthError(error: unknown): boolean {
     return true;
   }
   return /unauthorized|authentication required|\b401\b/i.test(error.message);
+}
+
+// Auth failures and 404s are terminal: retrying the connection can't fix a
+// missing endpoint or rejected credentials, so we surface the error and stop
+// the reconnect/ping loop instead of backing off forever.
+function isTerminalConnectError(error: unknown): boolean {
+  if (isAuthError(error)) {
+    return true;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if ((error as { code?: unknown }).code === HTTP_NOT_FOUND) {
+    return true;
+  }
+  return /\bnot found\b|\b404\b/i.test(error.message);
 }
 
 // mcp-use exposes no ping helper and its raw `request` hands the SDK an
@@ -215,6 +232,11 @@ class ServerConnection {
       }
       const detail = error instanceof Error ? error.message : String(error);
       log({ level: 'warn', message: `[${this.server.name}] Connection lost: ${detail}` });
+      if (isTerminalConnectError(error)) {
+        this.setStatus({ state: 'error', detail });
+        await this.disposeClient();
+        return;
+      }
       this.setStatus({ state: 'error', detail: 'Connection lost' });
       void this.reconnectAfterDrop();
     } finally {
@@ -288,7 +310,7 @@ class ServerConnection {
     log({ level: 'error', message: `[${this.server.name}] Connection failed: ${detail}` });
     this.setStatus({ state: 'error', detail });
     await this.disposeClient();
-    if (this.desiredConnected) {
+    if (this.desiredConnected && !isTerminalConnectError(error)) {
       this.scheduleReconnect();
     }
   }
