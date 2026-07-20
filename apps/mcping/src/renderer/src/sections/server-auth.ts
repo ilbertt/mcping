@@ -32,6 +32,7 @@ function applyAuthVisibility(options: { card: HTMLElement; type: ServerAuthType 
 
 function applyAuthState(options: { card: HTMLElement; state: ServerAuthState }): void {
   const { card, state } = options;
+  card.dataset.secretSet = String(state.secretSet);
   requireChild<HTMLElement>({ root: card, selector: '[data-role="secret-state"]' }).textContent =
     state.secretSet ? 'Saved ✓' : 'Not set';
   requireChild<HTMLElement>({ root: card, selector: '[data-role="oauth-state"]' }).textContent =
@@ -81,8 +82,9 @@ export function wireAuth(options: {
   card: HTMLElement;
   server: McpServer;
   state: ServerAuthState;
+  onChange: () => void;
 }): void {
-  const { card, server } = options;
+  const { card, server, onChange } = options;
   const select = requireChild<HTMLSelectElement>({ root: card, selector: '[data-auth="type"]' });
   const headerName = requireChild<HTMLInputElement>({
     root: card,
@@ -99,6 +101,7 @@ export function wireAuth(options: {
   select.addEventListener('change', () => {
     const type = select.value as ServerAuthType;
     applyAuthVisibility({ card, type });
+    onChange();
     void saveAuth({ card, id: server.id, type, headerName: headerName.value });
   });
   headerName.addEventListener('change', () => {
@@ -107,7 +110,7 @@ export function wireAuth(options: {
     }
   });
   secret.addEventListener('change', () => {
-    void saveSecret({ card, id: server.id, input: secret });
+    void saveSecret({ card, id: server.id, input: secret }).then(onChange);
   });
   actionButton({ card, action: 'sign-out' }).addEventListener('click', () => {
     void handleSignOut({ card, id: server.id });

@@ -31,7 +31,7 @@
       <section class="card">
         <details class="log-panel">
           <summary class="log-panel__summary">
-            <span class="card__title log-panel__title">Log</span>
+            <span class="card__title log-panel__title">Logs</span>
             <button id="copy-log" type="button" class="button button--ghost log-panel__copy">
               Copy
             </button>
@@ -50,23 +50,25 @@
         <div class="server__body">
         <p class="card__hint" data-role="detail"></p>
         <label class="field">
-          <span class="field__label">Name</span>
+          <span class="field__label">Name <span class="field__required">*</span></span>
           <input
             class="field__input"
             type="text"
             data-field="name"
             spellcheck="false"
             placeholder="My server"
+            required
           />
         </label>
         <label class="field">
-          <span class="field__label">Server URL</span>
+          <span class="field__label">Server URL <span class="field__required">*</span></span>
           <input
             class="field__input"
             type="text"
             data-field="url"
             spellcheck="false"
             placeholder="https://example.com/mcp"
+            required
           />
         </label>
         <label class="field">
