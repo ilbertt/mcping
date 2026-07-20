@@ -28,6 +28,7 @@ jobs:
         run: bun run release
 
       - name: Attest build provenance
+        id: attest
         uses: actions/attest@v4
         with:
           subject-path: |
@@ -39,6 +40,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
         run: |
           bun run --filter "@repo/internal-scripts" release-notes
           gh release create "$TAG_NAME" \
