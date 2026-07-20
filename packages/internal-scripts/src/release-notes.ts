@@ -27,8 +27,7 @@ async function attestationFooter() {
     return '';
   }
 
-  const server = Bun.env.GITHUB_SERVER_URL ?? 'https://github.com';
-  const attestationsUrl = `${server}/${repo}/attestations`;
+  const attestationsUrl = `https://github.com/${repo}/attestations`;
 
   return `
 
