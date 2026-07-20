@@ -1,8 +1,7 @@
 import { safeStorage } from 'electron';
 
-// Encrypts and decrypts secret strings through Electron's safeStorage, which is
-// backed by the macOS Keychain. Only the resulting base64 ciphertext is ever
-// written to disk. Stateless — shared as a singleton.
+// safeStorage-backed (macOS Keychain); only the resulting base64 ciphertext is
+// ever written to disk, never the raw secret.
 class SecretCipher {
   isAvailable(): boolean {
     return safeStorage.isEncryptionAvailable();

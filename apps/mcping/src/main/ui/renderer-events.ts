@@ -1,6 +1,7 @@
-import { getSettingsWindow } from '#main/settings-window.ts';
-import type { LogEntry, ServerStatus } from '#shared/types.ts';
-import { IPC } from '#shared/types.ts';
+import { getSettingsWindow } from '#main/ui/settings-window.ts';
+import type { ServerStatus } from '#shared/connection.ts';
+import { IPC } from '#shared/ipc.ts';
+import type { LogEntry } from '#shared/log.ts';
 
 function send(options: { channel: string; payload: unknown }): void {
   const window = getSettingsWindow();

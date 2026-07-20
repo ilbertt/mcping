@@ -1,6 +1,6 @@
-import { sendLogEntry } from '#main/renderer-events.ts';
-import type { LogEntry, LogLevel } from '#shared/types.ts';
-import { APP_NAME } from '#shared/types.ts';
+import { sendLogEntry } from '#main/ui/renderer-events.ts';
+import { APP_NAME } from '#shared/app.ts';
+import type { LogEntry, LogLevel } from '#shared/log.ts';
 
 const MAX_LOG_ENTRIES = 200;
 

@@ -1,7 +1,9 @@
 import { app } from 'electron';
 import Store from 'electron-store';
-import type { McpServer, ServerDraft, Settings } from '#shared/types.ts';
-import { DEFAULT_SERVER, DEFAULT_SETTINGS } from '#shared/types.ts';
+import type { McpServer, ServerDraft } from '#shared/server.ts';
+import { DEFAULT_SERVER } from '#shared/server.ts';
+import type { Settings } from '#shared/settings.ts';
+import { DEFAULT_SETTINGS } from '#shared/settings.ts';
 
 let store: Store<Settings> | null = null;
 

@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import type { Settings } from '#shared/types.ts';
+import type { Settings } from '#shared/settings.ts';
 
 // Only touch the login item when it actually changes: setting it is a no-op that
 // still fails noisily on unsigned builds (macOS blocks login items for apps that

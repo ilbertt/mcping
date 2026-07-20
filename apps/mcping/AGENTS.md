@@ -9,11 +9,10 @@ behalf. That boundary is the security model; keep it.
 
 ## Authentication
 
-Servers may require credentials (`bearer`, `header`, or `oauth`); the code lives
-in `src/main/auth/`. Two invariants to keep: **secrets never reach the
-renderer** (settings the renderer reads carry only the `auth` descriptor and a
-`ServerAuthState` boolean, never the value), and **only a user-initiated Connect
-may open the browser** — automatic reconnects surface "authorization required"
-instead of hijacking it.
+Servers may require credentials (`bearer`, `header`, or `oauth`). Two invariants
+to keep: **secrets never reach the renderer** (settings the renderer reads carry
+only the `auth` descriptor and a `ServerAuthState` boolean, never the value), and
+**only a user-initiated Connect may open the browser** — automatic reconnects
+surface "authorization required" instead of hijacking it.
 
 Monorepo-wide conventions live in the [root AGENTS.md](../../AGENTS.md).
