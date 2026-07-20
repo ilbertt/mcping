@@ -28,6 +28,37 @@ function findCard(serverId: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`.server[data-server-id="${serverId}"]`);
 }
 
+function trimmedValue(options: { card: HTMLElement; selector: string }): string {
+  return requireChild<HTMLInputElement>({
+    root: options.card,
+    selector: options.selector,
+  }).value.trim();
+}
+
+function serverFormComplete(card: HTMLElement): boolean {
+  if (
+    !trimmedValue({ card, selector: '[data-field="name"]' }) ||
+    !trimmedValue({ card, selector: '[data-field="url"]' })
+  ) {
+    return false;
+  }
+  const authType = requireChild<HTMLSelectElement>({
+    root: card,
+    selector: '[data-auth="type"]',
+  }).value;
+  if (authType === 'header') {
+    return (
+      Boolean(trimmedValue({ card, selector: '[data-auth="header-name"]' })) &&
+      card.dataset.secretSet === 'true'
+    );
+  }
+  return true;
+}
+
+function refreshConnectButton(card: HTMLElement): void {
+  actionButton({ card, action: 'connect' }).disabled = !serverFormComplete(card);
+}
+
 async function saveField(options: { id: string; input: HTMLInputElement }): Promise<void> {
   const key = options.input.dataset.field as keyof ServerDraft;
   const patch = (
@@ -70,6 +101,9 @@ function buildServerCard(options: { server: McpServer; authState: ServerAuthStat
   card.dataset.serverId = server.id;
   const title = requireChild<HTMLElement>({ root: card, selector: '[data-role="title"]' });
   title.textContent = server.name.trim() || 'Untitled server';
+  const refresh = (): void => {
+    refreshConnectButton(card);
+  };
   for (const input of card.querySelectorAll<HTMLInputElement>('[data-field]')) {
     const value = server[input.dataset.field as keyof ServerDraft];
     if (typeof value === 'boolean') {
@@ -80,6 +114,7 @@ function buildServerCard(options: { server: McpServer; authState: ServerAuthStat
     input.addEventListener('change', () => {
       void saveField({ id: server.id, input });
     });
+    input.addEventListener('input', refresh);
     if (input.dataset.field === 'name') {
       input.addEventListener('input', () => {
         title.textContent = input.value.trim() || 'Untitled server';
@@ -87,7 +122,8 @@ function buildServerCard(options: { server: McpServer; authState: ServerAuthStat
     }
   }
   wireCardActions({ card, id: server.id });
-  wireAuth({ card, server, state: authState });
+  wireAuth({ card, server, state: authState, onChange: refresh });
+  refresh();
   return card;
 }
 
