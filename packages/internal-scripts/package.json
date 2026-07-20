@@ -1,0 +1,19 @@
+{
+  "name": "@repo/internal-scripts",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "bump-version": "bun src/bump-version.ts",
+    "generate-changelog": "bun src/generate-changelog.ts",
+    "release-notes": "bun src/release-notes.ts",
+    "check:types": "bun run --bun tsc"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "git-cliff": "^2.13.1",
+    "typescript": "catalog:"
+  }
+}
