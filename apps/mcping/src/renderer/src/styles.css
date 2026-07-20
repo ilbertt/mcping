@@ -109,6 +109,12 @@ body {
   gap: 4px;
 }
 
+/* .field's display would otherwise beat the UA [hidden] rule, keeping auth
+   fields visible for the wrong auth type. */
+.field[hidden] {
+  display: none;
+}
+
 .field--switch {
   flex-direction: row;
   align-items: center;
