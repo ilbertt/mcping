@@ -1,0 +1,48 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # OIDC token for build provenance attestations
+  attestations: write # write the artifact attestations
+
+jobs:
+  release:
+    # macOS runner: electron-builder packages and (ad-hoc) codesigns the .app,
+    # which only works on macOS. macos-latest is Apple Silicon, matching the
+    # arm64 target that release.ts builds.
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - name: Build release artifacts
+        run: bun run release
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            apps/mcping/release/*.dmg
+            apps/mcping/release/*.zip
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+        run: |
+          bun run --filter "@repo/internal-scripts" release-notes
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --notes-file "$RELEASE_NOTES_FILE" \
+            apps/mcping/release/*.dmg \
+            apps/mcping/release/*.zip
