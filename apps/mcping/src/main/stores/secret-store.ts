@@ -5,10 +5,10 @@ interface SecretStoreShape {
   secrets: Record<string, string>;
 }
 
-// Static credentials (bearer token or custom-header value) keyed by server id.
-// Kept in a store separate from settings so the plaintext config the renderer
-// reads can never carry a secret, and so removing a server is a clean delete.
-// Values are keychain-encrypted ciphertext, never the raw secret.
+// The API-key header value keyed by server id. Kept in a store separate from
+// settings so the plaintext config the renderer reads can never carry a secret,
+// and so removing a server is a clean delete. Values are keychain-encrypted
+// ciphertext, never the raw secret.
 class SecretStore {
   private instance: Store<SecretStoreShape> | null = null;
 

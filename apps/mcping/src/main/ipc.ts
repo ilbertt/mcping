@@ -44,7 +44,7 @@ function clearStaleAuth(options: { id: string; previous: ServerAuth; next: Serve
   if (options.previous.type === options.next.type) {
     return;
   }
-  if (options.previous.type === 'bearer' || options.previous.type === 'header') {
+  if (options.previous.type === 'header') {
     secretStore.clear(options.id);
   }
   if (options.previous.type === 'oauth') {

@@ -10,8 +10,6 @@ function authDescriptor(options: { type: ServerAuthType; headerName: string }): 
   switch (options.type) {
     case 'header':
       return { type: 'header', name: options.headerName.trim() || DEFAULT_HEADER_NAME };
-    case 'bearer':
-      return { type: 'bearer' };
     case 'oauth':
       return { type: 'oauth' };
     case 'none':
@@ -28,10 +26,8 @@ function applyAuthVisibility(options: { card: HTMLElement; type: ServerAuthType 
     }).hidden = config.hidden;
   };
   setHidden({ name: 'header-name', hidden: type !== 'header' });
-  setHidden({ name: 'secret', hidden: type !== 'bearer' && type !== 'header' });
+  setHidden({ name: 'secret', hidden: type !== 'header' });
   setHidden({ name: 'oauth', hidden: type !== 'oauth' });
-  requireChild<HTMLElement>({ root: card, selector: '[data-role="secret-label"]' }).textContent =
-    type === 'header' ? 'Header value' : 'Token';
 }
 
 function applyAuthState(options: { card: HTMLElement; state: ServerAuthState }): void {
@@ -110,7 +106,7 @@ export function wireAuth(options: {
       void saveAuth({ card, id: server.id, type: 'header', headerName: headerName.value });
     }
   });
-  actionButton({ card, action: 'save-secret' }).addEventListener('click', () => {
+  secret.addEventListener('change', () => {
     void saveSecret({ card, id: server.id, input: secret });
   });
   actionButton({ card, action: 'sign-out' }).addEventListener('click', () => {
