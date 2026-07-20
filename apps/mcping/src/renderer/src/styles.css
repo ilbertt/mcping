@@ -125,6 +125,10 @@ body {
   color: var(--text);
 }
 
+.field__required {
+  color: var(--warn-fg);
+}
+
 .field__input {
   width: 100%;
   padding: 6px 8px;
@@ -143,15 +147,6 @@ body {
 .field__select {
   appearance: none;
   cursor: pointer;
-}
-
-.auth-secret {
-  display: flex;
-  gap: 8px;
-}
-
-.auth-secret .field__input {
-  flex: 1;
 }
 
 .auth-signout {

@@ -73,28 +73,31 @@
           <span class="field__label">Authentication</span>
           <select class="field__input field__select" data-auth="type">
             <option value="none">None</option>
-            <option value="bearer">Bearer token</option>
-            <option value="header">Custom header</option>
+            <option value="header">API key</option>
             <option value="oauth">OAuth (browser)</option>
           </select>
         </label>
         <label class="field" data-auth-field="header-name" hidden>
-          <span class="field__label">Header name</span>
-          <input class="field__input" type="text" data-auth="header-name" spellcheck="false" />
+          <span class="field__label">Header name <span class="field__required">*</span></span>
+          <input
+            class="field__input"
+            type="text"
+            data-auth="header-name"
+            spellcheck="false"
+            required
+          />
         </label>
         <div class="field" data-auth-field="secret" hidden>
-          <span class="field__label" data-role="secret-label">Token</span>
-          <div class="auth-secret">
-            <input
-              class="field__input"
-              type="password"
-              data-auth="secret"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="Paste credential"
-            />
-            <button type="button" class="button" data-action="save-secret">Save</button>
-          </div>
+          <span class="field__label">Header value <span class="field__required">*</span></span>
+          <input
+            class="field__input"
+            type="password"
+            data-auth="secret"
+            spellcheck="false"
+            autocomplete="off"
+            required
+            placeholder="Paste API key"
+          />
           <p class="card__hint" data-role="secret-state"></p>
         </div>
         <div class="field" data-auth-field="oauth" hidden>
