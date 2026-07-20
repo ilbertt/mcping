@@ -28,8 +28,6 @@ jobs:
         run: bun run release
 
       - name: Attest build provenance
-        # actions/attest with only subject-path defaults to Provenance mode,
-        # auto-generating SLSA build provenance for the artifacts.
         uses: actions/attest@v4
         with:
           subject-path: |
