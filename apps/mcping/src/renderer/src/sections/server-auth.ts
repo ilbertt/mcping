@@ -95,7 +95,8 @@ export function wireAuth(options: {
   const secret = requireChild<HTMLInputElement>({ root: card, selector: '[data-auth="secret"]' });
 
   select.value = server.auth.type;
-  headerName.value = server.auth.type === 'header' ? server.auth.name : DEFAULT_HEADER_NAME;
+  headerName.placeholder = DEFAULT_HEADER_NAME;
+  headerName.value = server.auth.type === 'header' ? server.auth.name : '';
   applyAuthVisibility({ card, type: server.auth.type });
   applyAuthState({ card, state: options.state });
 

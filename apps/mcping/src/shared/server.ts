@@ -8,11 +8,11 @@ export interface McpServer {
   auth: ServerAuth;
 }
 
-// Per-server defaults: the template when the user adds a server, and the seed
-// that debug builds preload (the local demo server) so development needs no
-// manual setup. A released install starts with no servers — see settings-store.
+// The demo server that debug builds preload so development needs no manual setup.
+// A released install starts with no servers, and the "Add server" form starts
+// empty (placeholders only) — see settings-store and the renderer server card.
 // 127.0.0.1 (not localhost) avoids IPv4/IPv6 ambiguity on the default host.
-export const DEFAULT_SERVER: Omit<McpServer, 'id'> = {
+export const DEMO_SERVER: Omit<McpServer, 'id'> = {
   name: 'My server',
   url: 'http://127.0.0.1:3050/mcp',
   autoConnect: true,
