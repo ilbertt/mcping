@@ -29,7 +29,7 @@ export function setupAuth(options: {
       return {
         serverOptions: {},
         protect: (server) => protectWithApiKey({ server, apiKey }),
-        summary: `API key\n  Bearer token or ${API_KEY_HEADER} header: ${apiKey}`,
+        summary: `API key\n  Header name: ${API_KEY_HEADER}\n  Header value: ${apiKey}`,
       };
     }
     default:

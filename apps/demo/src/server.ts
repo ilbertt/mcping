@@ -30,6 +30,7 @@ console.log = (...args: unknown[]) => {
 
 const { authMode } = parseCliOptions();
 const auth = setupAuth({ authMode, host: HOST, oauthPort: AUTH_PORT });
+const authLabel = authMode ?? 'no auth';
 
 const server = createMCPServer('mcping-demo', {
   version: '0.1.0',
@@ -45,11 +46,33 @@ auth.protect?.(server);
 // come back empty). getHandler() runs the same app in fetch mode, which Bun
 // serves natively, so metadata and error bodies are delivered intact.
 const handler = await server.getHandler();
-Bun.serve({ hostname: HOST, port: PORT, fetch: handler });
+// idleTimeout: 0 disables Bun's 10s socket idle timeout. The in-memory stream
+// manager sends no heartbeats, so the long-lived MCP SSE stream would otherwise
+// be closed (with a "request timed out" warning) whenever it sits idle.
+Bun.serve({ hostname: HOST, port: PORT, fetch: handler, idleTimeout: 0 });
 
 process.stdout.write(
-  `URL: ${MCP_URL}\nAuthentication: ${auth.summary}\n\nType here the message to send to mcping:\n> `,
+  `Server running!\n\nURL: ${MCP_URL}\nAuthentication: ${auth.summary}\n\nType here the message to send to mcping:\n> `,
 );
+
+// mcp-use exposes no connection event, so poll the active sessions and announce
+// any session id we haven't seen before.
+const CLIENT_POLL_INTERVAL_MS = 1000;
+let knownSessions = new Set<string>();
+setInterval(() => {
+  const current = server.getActiveSessions();
+  let connected = false;
+  for (const sessionId of current) {
+    if (!knownSessions.has(sessionId)) {
+      process.stdout.write(`\nClient connected (${authLabel})!`);
+      connected = true;
+    }
+  }
+  knownSessions = new Set(current);
+  if (connected) {
+    process.stdout.write('\n> ');
+  }
+}, CLIENT_POLL_INTERVAL_MS);
 
 for await (const line of console) {
   const text = line.trim();
