@@ -11,7 +11,7 @@ import {
 import { join } from 'node:path';
 import { app } from 'electron';
 import { auth, type KVStore, NodeOAuthClientProvider } from 'mcp-use/auth/node';
-import { decryptSecret, encryptSecret } from '#main/auth/safe-storage.ts';
+import { secretCipher } from '#main/auth/secret-cipher.ts';
 
 const OAUTH_DIR = 'oauth';
 const CLIENT_NAME = 'mcping';
@@ -54,7 +54,7 @@ class EncryptedKvStore implements KVStore {
       return null;
     }
     try {
-      return decryptSecret(readFileSync(file, 'utf8'));
+      return secretCipher.decrypt(readFileSync(file, 'utf8'));
     } catch {
       return null;
     }
@@ -65,7 +65,7 @@ class EncryptedKvStore implements KVStore {
     mkdirSync(this.dir, { recursive: true, mode: DIR_MODE });
     const file = this.fileFor(key);
     const tmp = `${file}.tmp`;
-    writeFileSync(tmp, encryptSecret(value), { mode: FILE_MODE });
+    writeFileSync(tmp, secretCipher.encrypt(value), { mode: FILE_MODE });
     renameSync(tmp, file);
   }
 

@@ -2,7 +2,7 @@ import { shell } from 'electron';
 import type { NodeOAuthClientProvider } from 'mcp-use/auth/node';
 import { MCPClient } from 'mcp-use/client';
 import { completeAuthorization, createOauthProvider } from '#main/auth/oauth.ts';
-import { getSecret } from '#main/auth/secret-store.ts';
+import { secretStore } from '#main/auth/secret-store.ts';
 import { log } from '#main/logger.ts';
 import { handleNotification } from '#main/notification-handler.ts';
 import { sendStatus } from '#main/renderer-events.ts';
@@ -40,14 +40,14 @@ function buildServerConfig(options: {
   const config: HttpServerConfig = { url: server.url };
   switch (server.auth.type) {
     case 'bearer': {
-      const token = getSecret(server.id);
+      const token = secretStore.get(server.id);
       if (token) {
         config.authToken = token;
       }
       break;
     }
     case 'header': {
-      const value = getSecret(server.id);
+      const value = secretStore.get(server.id);
       if (value) {
         config.headers = { [server.auth.name]: value };
       }

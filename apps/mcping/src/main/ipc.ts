@@ -1,7 +1,7 @@
 import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 import { clearOauth, hasOauthTokens } from '#main/auth/oauth.ts';
-import { clearSecret, hasSecret, setSecret } from '#main/auth/secret-store.ts';
+import { secretStore } from '#main/auth/secret-store.ts';
 import { getLog } from '#main/logger.ts';
 import { syncLoginItem } from '#main/login-item.ts';
 import {
@@ -45,7 +45,7 @@ function clearStaleAuth(options: { id: string; previous: ServerAuth; next: Serve
     return;
   }
   if (options.previous.type === 'bearer' || options.previous.type === 'header') {
-    clearSecret(options.id);
+    secretStore.clear(options.id);
   }
   if (options.previous.type === 'oauth') {
     clearOauth(options.id);
@@ -56,7 +56,7 @@ function authStates(): Record<string, ServerAuthState> {
   const states: Record<string, ServerAuthState> = {};
   for (const server of getSettings().servers) {
     states[server.id] = {
-      secretSet: hasSecret(server.id),
+      secretSet: secretStore.has(server.id),
       oauthAuthorized: hasOauthTokens(server.id),
     };
   }
@@ -92,7 +92,7 @@ export function registerIpc(): void {
   handle<string, Settings>({
     channel: IPC.serversRemove,
     handler: (id) => {
-      clearSecret(id);
+      secretStore.clear(id);
       clearOauth(id);
       return applyServerChange(removeServer(id));
     },
@@ -100,7 +100,7 @@ export function registerIpc(): void {
   handle<{ id: string; secret: string }, void>({
     channel: IPC.serverSecretSet,
     handler: (options) => {
-      setSecret(options);
+      secretStore.set(options);
       reconnectIfActive(options.id);
     },
   });
