@@ -14,10 +14,9 @@ export interface LocalOAuthServer {
   issuer: string;
 }
 
-// A throwaway OAuth 2.1 authorization server for the demo: it advertises the
-// endpoints mcping's client discovers, registers any client, auto-approves every
-// authorization request, and issues in-memory bearer tokens. Just enough to
-// exercise mcping's OAuth path locally — it checks no PKCE and protects nothing.
+// A throwaway authorization server for the demo: auto-approves every request,
+// verifies no PKCE, hands out in-memory tokens. Enough to drive mcping's OAuth
+// path locally, and nothing more.
 export function startLocalOAuthServer(options: { host: string; port: number }): LocalOAuthServer {
   const { host, port } = options;
   const issuer = `http://${host}:${port}`;
@@ -46,8 +45,7 @@ export function startLocalOAuthServer(options: { host: string; port: number }): 
     verifyToken,
   });
 
-  // Dynamic client registration: the MCP client validates that the response
-  // echoes redirect_uris, so return them alongside a fresh client id.
+  // The MCP client rejects the registration response unless it echoes redirect_uris.
   const register = async (request: Request): Promise<Response> => {
     const body = (await request.json().catch(() => ({}))) as { redirect_uris?: string[] };
     return Response.json(

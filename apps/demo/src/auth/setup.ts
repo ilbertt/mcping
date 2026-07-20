@@ -5,13 +5,11 @@ import { AuthMode } from '#cli.ts';
 
 type McpServer = ReturnType<typeof createMCPServer>;
 
+// mcp-use configures OAuth natively via createMCPServer; API-key auth has no
+// config option, so it is applied to the built server through `protect`.
 export interface AuthSetup {
-  // Merged into createMCPServer. OAuth is the only scheme mcp-use configures
-  // natively; API-key auth has no config option, so it is applied post-build
-  // through `protect` instead.
   serverOptions: { oauth?: OAuthProvider };
   protect?: (server: McpServer) => void;
-  // One-line (for OAuth/None) or short block (for API key) shown in the banner.
   summary: string;
 }
 

@@ -8,8 +8,7 @@ const BEARER_PREFIX = 'Bearer ';
 const UNAUTHORIZED = 401;
 const GUARDED_PATHS = ['/mcp', '/mcp/*'];
 
-// mcping can send the key either as a bearer token or as the X-API-Key header,
-// so accept both — whichever auth type the user picks in the app just works.
+// Accept the key as a bearer token or the X-API-Key header (either mcping auth type).
 function extractApiKey(headers: {
   authorization: string | undefined;
   apiKeyHeader: string | undefined;
@@ -21,8 +20,6 @@ function extractApiKey(headers: {
   return apiKeyHeader;
 }
 
-// Registered before `listen()` mounts the MCP routes, so this middleware runs
-// first and rejects requests that don't carry the key.
 export function protectWithApiKey(options: { server: McpServer; apiKey: string }): void {
   const { server, apiKey } = options;
   for (const path of GUARDED_PATHS) {

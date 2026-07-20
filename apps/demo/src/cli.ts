@@ -9,8 +9,6 @@ function toAuthMode(value: string): AuthMode | undefined {
   return Object.values(AuthMode).find((mode) => mode === value);
 }
 
-// `--auth apikey|oauth` picks how the demo server authenticates clients. Omitted
-// means no auth, matching the server's original behaviour.
 export function parseCliOptions(): { authMode: AuthMode | undefined } {
   const { values } = parseArgs({
     args: process.argv.slice(2),

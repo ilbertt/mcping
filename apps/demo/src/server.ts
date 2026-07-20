@@ -15,8 +15,7 @@ const HOST = '127.0.0.1';
 const BASE_URL = `http://${HOST}:${PORT}`;
 const MCP_URL = `${BASE_URL}/mcp`;
 
-// Silence mcp-use's chatter so only the demo's prompt shows: startup banners
-// (tag-prefixed) and per-request logs (timestamp-prefixed, ANSI-wrapped).
+// Drop mcp-use's startup banners and per-request log lines so only the prompt shows.
 const FRAMEWORK_LOG =
   /^\s*(\[(CSP|WIDGETS|INSPECTOR|MCP|SERVER|OAuth)\]|widgetsDir|📋|Tools:|Prompts:|Resources:)/u;
 const REQUEST_LOG = /\[\d{2}:\d{2}:\d{2}\.\d{3}\]/u;
