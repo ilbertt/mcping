@@ -47,8 +47,8 @@ bun run --filter @repo/demo server --auth oauth    # local OAuth server
 ```
 
 - **`apikey`** prints a random key (a `crypto.randomUUID()`) on startup. In
-  mcping, open the server's auth settings, pick **Bearer token** or the
-  **X-API-Key** header, and paste the key — the server accepts it either way.
+  mcping, open the server's auth settings, choose the **X-API-Key** header, and
+  paste the key.
 - **`oauth`** starts a throwaway local authorization server on
   `http://127.0.0.1:3051`. In mcping, set the auth type to **OAuth** and click
   **Connect**; your browser opens briefly to complete authorization and the token
