@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [unreleased]
+## [2026.7.20-1] - 2026-07-20
 
 ### 🚀 Features
 
@@ -48,7 +48,7 @@ All notable changes to this project are documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Add CalVer prepare-release workflow
+- Add CalVer prepare-release workflow (#10)
 - *(mcping)* Set the tagline to "Let MCP servers ping you"
 - Set up project as mcping
 - Remove my-package template package
