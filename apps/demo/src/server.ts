@@ -46,7 +46,10 @@ auth.protect?.(server);
 // come back empty). getHandler() runs the same app in fetch mode, which Bun
 // serves natively, so metadata and error bodies are delivered intact.
 const handler = await server.getHandler();
-Bun.serve({ hostname: HOST, port: PORT, fetch: handler });
+// idleTimeout: 0 disables Bun's 10s socket idle timeout. The in-memory stream
+// manager sends no heartbeats, so the long-lived MCP SSE stream would otherwise
+// be closed (with a "request timed out" warning) whenever it sits idle.
+Bun.serve({ hostname: HOST, port: PORT, fetch: handler, idleTimeout: 0 });
 
 process.stdout.write(
   `Server running!\n\nURL: ${MCP_URL}\nAuthentication: ${auth.summary}\n\nType here the message to send to mcping:\n> `,
