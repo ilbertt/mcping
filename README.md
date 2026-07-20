@@ -17,6 +17,22 @@ Download the app from the
 [latest release](https://github.com/ilbertt/mcping/releases/latest), drag it to
 your Applications folder, open it, and connect to your favorite MCP servers.
 
+### Authenticated servers
+
+Servers that require credentials work too. For each server, pick an
+authentication method:
+
+- **Bearer token** — sent as `Authorization: Bearer <token>` (personal access
+  tokens, most "API key" servers).
+- **Custom header** — any header name and value (e.g. `X-API-Key`).
+- **OAuth** — the [MCP spec's](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+  OAuth 2.1 flow. Click **Connect** and mcping opens your browser to sign in;
+  it captures the result on a localhost redirect and refreshes tokens
+  automatically. No client setup needed — it registers itself dynamically.
+
+Credentials never leave your Mac: tokens are encrypted in the macOS Keychain and
+are never written to the config file.
+
 > [!NOTE]
 > mcping isn't notarized by Apple, so on first launch macOS may say it's
 > "damaged and can't be opened." It isn't — macOS just quarantines apps it can't

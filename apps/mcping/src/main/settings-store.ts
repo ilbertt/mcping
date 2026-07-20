@@ -2,6 +2,19 @@ import Store from 'electron-store';
 import type { McpServer, ServerDraft, Settings } from '#shared/types.ts';
 import { DEFAULT_SERVER, DEFAULT_SETTINGS } from '#shared/types.ts';
 
+// Store defaults only backfill absent top-level keys, so servers persisted before
+// `auth` existed keep coming back without it. Fill it in on load.
+function normalizeServers(target: Store<Settings>): void {
+  const servers = target.store.servers;
+  if (servers.every((server) => server.auth !== undefined)) {
+    return;
+  }
+  target.set(
+    'servers',
+    servers.map((server) => (server.auth ? server : { ...server, auth: DEFAULT_SERVER.auth })),
+  );
+}
+
 let store: Store<Settings> | null = null;
 
 // Fields from the pre-multi-server flat settings shape. Kept only to migrate an
@@ -26,6 +39,7 @@ function migrateLegacy(target: Store<Settings>): void {
     name: DEFAULT_SERVER.name,
     url: legacy.serverUrl,
     autoConnect: legacy.autoConnect ?? DEFAULT_SERVER.autoConnect,
+    auth: DEFAULT_SERVER.auth,
   };
   target.set('servers', [migrated]);
   for (const key of LEGACY_KEYS) {
@@ -37,6 +51,7 @@ function requireStore(): Store<Settings> {
   if (!store) {
     store = new Store<Settings>({ defaults: DEFAULT_SETTINGS });
     migrateLegacy(store);
+    normalizeServers(store);
   }
   return store;
 }

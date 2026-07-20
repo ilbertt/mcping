@@ -57,6 +57,40 @@
           <span class="field__label">Server URL</span>
           <input class="field__input" type="text" data-field="url" spellcheck="false" />
         </label>
+        <label class="field">
+          <span class="field__label">Authentication</span>
+          <select class="field__input field__select" data-auth="type">
+            <option value="none">None</option>
+            <option value="bearer">Bearer token</option>
+            <option value="header">Custom header</option>
+            <option value="oauth">OAuth (browser)</option>
+          </select>
+        </label>
+        <label class="field" data-auth-field="header-name" hidden>
+          <span class="field__label">Header name</span>
+          <input class="field__input" type="text" data-auth="header-name" spellcheck="false" />
+        </label>
+        <div class="field" data-auth-field="secret" hidden>
+          <span class="field__label" data-role="secret-label">Token</span>
+          <div class="auth-secret">
+            <input
+              class="field__input"
+              type="password"
+              data-auth="secret"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="Paste credential"
+            />
+            <button type="button" class="button" data-action="save-secret">Save</button>
+          </div>
+          <p class="card__hint" data-role="secret-state"></p>
+        </div>
+        <div class="field" data-auth-field="oauth" hidden>
+          <p class="card__hint" data-role="oauth-state"></p>
+          <button type="button" class="button button--ghost auth-signout" data-action="sign-out" hidden>
+            Sign out
+          </button>
+        </div>
         <label class="field field--switch">
           <input type="checkbox" data-field="autoConnect" />
           <span class="field__label">Connect automatically on launch</span>

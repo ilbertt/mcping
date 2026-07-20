@@ -1,9 +1,13 @@
+import { shell } from 'electron';
+import type { NodeOAuthClientProvider } from 'mcp-use/auth/node';
 import { MCPClient } from 'mcp-use/client';
+import { completeAuthorization, createOauthProvider } from '#main/auth/oauth.ts';
+import { getSecret } from '#main/auth/secret-store.ts';
 import { log } from '#main/logger.ts';
 import { handleNotification } from '#main/notification-handler.ts';
 import { sendStatus } from '#main/renderer-events.ts';
 import { getSettings } from '#main/settings-store.ts';
-import type { ConnectionStatus, McpServer, ServerStatus } from '#shared/types.ts';
+import type { ConnectionStatus, McpServer, ServerAuth, ServerStatus } from '#shared/types.ts';
 
 const SESSION_KEY = 'server';
 const MS_PER_SECOND = 1000;
@@ -12,6 +16,77 @@ const MAX_BACKOFF_MS = 30_000;
 const BACKOFF_FACTOR = 2;
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 const HEALTH_CHECK_TIMEOUT_MS = 4000;
+const HTTP_UNAUTHORIZED = 401;
+
+const AUTH_REQUIRED_DETAIL = 'Authorization required — click Connect';
+const AWAITING_AUTH_DETAIL = 'Waiting for browser authorization…';
+
+interface HttpServerConfig {
+  url: string;
+  authToken?: string;
+  headers?: Record<string, string>;
+  authProvider?: NodeOAuthClientProvider;
+}
+
+// Translate a server's auth mode into the credential fields mcp-use forwards to
+// the transport: a bearer header, a custom header, or the OAuth provider that
+// drives the browser flow. Secrets are read from the keychain-backed store here
+// and never live in the persisted server config.
+function buildServerConfig(options: {
+  server: McpServer;
+  oauthProvider: NodeOAuthClientProvider | null;
+}): HttpServerConfig {
+  const { server, oauthProvider } = options;
+  const config: HttpServerConfig = { url: server.url };
+  switch (server.auth.type) {
+    case 'bearer': {
+      const token = getSecret(server.id);
+      if (token) {
+        config.authToken = token;
+      }
+      break;
+    }
+    case 'header': {
+      const value = getSecret(server.id);
+      if (value) {
+        config.headers = { [server.auth.name]: value };
+      }
+      break;
+    }
+    case 'oauth': {
+      if (oauthProvider) {
+        config.authProvider = oauthProvider;
+      }
+      break;
+    }
+    case 'none':
+      break;
+  }
+  return config;
+}
+
+function authEquals(options: { a: ServerAuth; b: ServerAuth }): boolean {
+  const { a, b } = options;
+  if (a.type !== b.type) {
+    return false;
+  }
+  if (a.type === 'header' && b.type === 'header') {
+    return a.name === b.name;
+  }
+  return true;
+}
+
+// mcp-use collapses a transport 401 into a generic Error carrying `code: 401`
+// (after the SDK has already opened the browser via our provider).
+function isAuthError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if ((error as { code?: unknown }).code === HTTP_UNAUTHORIZED) {
+    return true;
+  }
+  return /unauthorized|authentication required|\b401\b/i.test(error.message);
+}
 
 // mcp-use exposes no ping helper and its raw `request` hands the SDK an
 // undefined result schema (which throws while parsing every response), so reach
@@ -41,6 +116,11 @@ class ServerConnection {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private healthTimer: NodeJS.Timeout | null = null;
   private healthCheckInFlight = false;
+  private oauthProvider: NodeOAuthClientProvider | null = null;
+  private oauthProviderUrl: string | null = null;
+  // Only a user-initiated connect may open the browser; silent reconnects must
+  // not hijack it, so they surface "authorization required" instead.
+  private interactiveAuth = false;
 
   constructor(options: { server: McpServer; onStatus: (status: ConnectionStatus) => void }) {
     this.server = options.server;
@@ -51,10 +131,15 @@ class ServerConnection {
     return this.status;
   }
 
+  isActive(): boolean {
+    return this.desiredConnected;
+  }
+
   updateConfig(server: McpServer): void {
-    const urlChanged = this.server.url !== server.url;
+    const changed =
+      this.server.url !== server.url || !authEquals({ a: this.server.auth, b: server.auth });
     this.server = server;
-    if (urlChanged && this.desiredConnected) {
+    if (changed && this.desiredConnected) {
       void this.connect();
     }
   }
@@ -96,6 +181,9 @@ class ServerConnection {
 
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
+    // Reconnects are automatic, so they may reuse or refresh existing tokens but
+    // must never pop the browser unprompted.
+    this.interactiveAuth = false;
     const delay = this.backoffMs;
     this.backoffMs = Math.min(this.backoffMs * BACKOFF_FACTOR, MAX_BACKOFF_MS);
     log({
@@ -147,6 +235,94 @@ class ServerConnection {
     }
   }
 
+  private disposeOauthProvider(): void {
+    this.oauthProvider?.dispose();
+    this.oauthProvider = null;
+    this.oauthProviderUrl = null;
+  }
+
+  private async getOauthProvider(): Promise<NodeOAuthClientProvider> {
+    if (this.oauthProvider && this.oauthProviderUrl === this.server.url) {
+      return this.oauthProvider;
+    }
+    this.disposeOauthProvider();
+    this.oauthProvider = await createOauthProvider({
+      serverId: this.server.id,
+      url: this.server.url,
+      openBrowser: (url) => this.openAuthUrl(url),
+    });
+    this.oauthProviderUrl = this.server.url;
+    return this.oauthProvider;
+  }
+
+  private async openAuthUrl(url: string): Promise<void> {
+    if (!this.interactiveAuth) {
+      return;
+    }
+    await shell.openExternal(url);
+  }
+
+  private async createClientSession(
+    oauthProvider: NodeOAuthClientProvider | null,
+  ): Promise<MCPClient> {
+    const serverConfig = buildServerConfig({ server: this.server, oauthProvider });
+    const client = new MCPClient(
+      { mcpServers: { [SESSION_KEY]: serverConfig } },
+      {
+        onNotification: (notification) => handleNotification({ notification, server: this.server }),
+      },
+    );
+    try {
+      await client.createSession(SESSION_KEY);
+      return client;
+    } catch (error) {
+      await client.closeAllSessions().catch(() => undefined);
+      throw error;
+    }
+  }
+
+  private onConnected(client: MCPClient): void {
+    this.client = client;
+    this.backoffMs = INITIAL_BACKOFF_MS;
+    this.setStatus({ state: 'connected', detail: this.server.url });
+    log({ level: 'info', message: `[${this.server.name}] Connected` });
+    this.startHealthCheck();
+  }
+
+  private async onConnectError(error: unknown): Promise<void> {
+    const detail = error instanceof Error ? error.message : String(error);
+    log({ level: 'error', message: `[${this.server.name}] Connection failed: ${detail}` });
+    this.setStatus({ state: 'error', detail });
+    await this.disposeClient();
+    if (this.desiredConnected) {
+      this.scheduleReconnect();
+    }
+  }
+
+  // The SDK opened the browser and bound the loopback before the 401 surfaced.
+  // If this attempt is interactive, finish the flow and reconnect; otherwise
+  // cancel it and ask the user to reconnect — auth is not a transient failure,
+  // so we don't schedule a backoff retry.
+  private async handleAuthError(provider: NodeOAuthClientProvider): Promise<void> {
+    if (!this.interactiveAuth || !provider.hasPendingFlow) {
+      // Drop the provider (closing its loopback) and clear the cache so the next
+      // user-initiated Connect builds a fresh one rather than reusing this one.
+      this.disposeOauthProvider();
+      log({ level: 'warn', message: `[${this.server.name}] Authorization required` });
+      this.setStatus({ state: 'error', detail: AUTH_REQUIRED_DETAIL });
+      await this.disposeClient();
+      return;
+    }
+    this.setStatus({ state: 'connecting', detail: AWAITING_AUTH_DETAIL });
+    try {
+      const code = await provider.getAuthorizationCode();
+      await completeAuthorization({ provider, url: this.server.url, code });
+      this.onConnected(await this.createClientSession(provider));
+    } catch (error) {
+      await this.onConnectError(error);
+    }
+  }
+
   private async attemptConnect(): Promise<void> {
     if (!this.desiredConnected) {
       return;
@@ -154,33 +330,24 @@ class ServerConnection {
     const { url, name } = this.server;
     this.setStatus({ state: 'connecting', detail: url });
     log({ level: 'info', message: `[${name}] Connecting to ${url}` });
+    let provider: NodeOAuthClientProvider | null = null;
     try {
-      const next = new MCPClient(
-        { mcpServers: { [SESSION_KEY]: { url } } },
-        {
-          onNotification: (notification) =>
-            handleNotification({ notification, server: this.server }),
-        },
-      );
-      await next.createSession(SESSION_KEY);
-      this.client = next;
-      this.backoffMs = INITIAL_BACKOFF_MS;
-      this.setStatus({ state: 'connected', detail: url });
-      log({ level: 'info', message: `[${name}] Connected` });
-      this.startHealthCheck();
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      log({ level: 'error', message: `[${name}] Connection failed: ${detail}` });
-      this.setStatus({ state: 'error', detail });
-      await this.disposeClient();
-      if (this.desiredConnected) {
-        this.scheduleReconnect();
+      if (this.server.auth.type === 'oauth') {
+        provider = await this.getOauthProvider();
       }
+      this.onConnected(await this.createClientSession(provider));
+    } catch (error) {
+      if (provider && isAuthError(error)) {
+        await this.handleAuthError(provider);
+        return;
+      }
+      await this.onConnectError(error);
     }
   }
 
   async connect(): Promise<void> {
     this.desiredConnected = true;
+    this.interactiveAuth = true;
     this.clearReconnectTimer();
     this.backoffMs = INITIAL_BACKOFF_MS;
     await this.disposeClient();
@@ -190,6 +357,7 @@ class ServerConnection {
   async disconnect(): Promise<void> {
     this.desiredConnected = false;
     this.clearReconnectTimer();
+    this.disposeOauthProvider();
     await this.disposeClient();
     this.setStatus({ state: 'disconnected' });
     log({ level: 'info', message: `[${this.server.name}] Disconnected` });
@@ -198,6 +366,7 @@ class ServerConnection {
   async dispose(): Promise<void> {
     this.desiredConnected = false;
     this.clearReconnectTimer();
+    this.disposeOauthProvider();
     await this.disposeClient();
   }
 }
@@ -262,6 +431,15 @@ export async function connectServer(serverId: string): Promise<void> {
 
 export async function disconnectServer(serverId: string): Promise<void> {
   await connections.get(serverId)?.disconnect();
+}
+
+// A credential changed under a live connection: reconnect so the new secret
+// takes effect. No-op when the server isn't meant to be connected.
+export function reconnectIfActive(serverId: string): void {
+  const connection = connections.get(serverId);
+  if (connection?.isActive()) {
+    void connection.connect();
+  }
 }
 
 export function connectAutoConnectServers(): void {
