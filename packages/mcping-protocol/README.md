@@ -35,7 +35,6 @@ the demo) and the mcping client — share one source of truth:
 | `MCPING_EXTENSION_ID` | `io.github.ilbertt/mcping` — the reverse-DNS extension identifier |
 | `MCPING_EXTENSION_CAPABILITY` | the `{ "io.github.ilbertt/mcping": {} }` entry a server advertises in `ServerCapabilities.extensions` (via `server/discover`) |
 | `MCPING_SUBSCRIPTION_FILTER` / `McpingSubscriptionFilterSchema` | the `{ push: true }` field a client merges into the `subscriptions/listen` filter to receive `notifications/mcping/push` on that stream (the Tasks-style "Subscription Additions" pattern) |
-| `isValidThirdPartyExtensionId` | checks an identifier against the MCP 2026-07-28 `_meta` key rules (a prefix is reserved only when its second label is `modelcontextprotocol` or `mcp`) |
 
 ## Usage
 

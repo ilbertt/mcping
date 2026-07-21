@@ -34,34 +34,3 @@ export const MCPING_SUBSCRIPTION_FILTER: McpingSubscriptionFilter = { push: true
 export const MCPING_EXTENSION_CAPABILITY: Readonly<Record<string, Record<string, never>>> = {
   [MCPING_EXTENSION_ID]: {},
 };
-
-const RESERVED_SECOND_LABELS = new Set(['modelcontextprotocol', 'mcp']);
-const EXTENSION_ID_PATTERN = /^([^/]+)\/(.+)$/;
-const PREFIX_LABEL_PATTERN = /^[a-zA-Z]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
-const EXTENSION_NAME_PATTERN = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
-
-/**
- * Whether `id` is a valid, non-reserved third-party MCP extension identifier: a
- * reverse-DNS prefix, `/`, then a name — with the prefix's SECOND label neither
- * `modelcontextprotocol` nor `mcp`. Encodes the `_meta` key naming rules from the
- * MCP 2026-07-28 spec (`basic/index#meta`).
- */
-export function isValidThirdPartyExtensionId(id: string): boolean {
-  const match = EXTENSION_ID_PATTERN.exec(id);
-  if (!match) {
-    return false;
-  }
-  const [, prefix, name] = match;
-  if (prefix === undefined || name === undefined) {
-    return false;
-  }
-  if (!EXTENSION_NAME_PATTERN.test(name)) {
-    return false;
-  }
-  const labels = prefix.split('.');
-  if (!labels.every((label) => PREFIX_LABEL_PATTERN.test(label))) {
-    return false;
-  }
-  const secondLabel = labels.at(1);
-  return secondLabel === undefined || !RESERVED_SECOND_LABELS.has(secondLabel);
-}
