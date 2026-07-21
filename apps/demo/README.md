@@ -62,15 +62,6 @@ the extension identity also live there. The wire frame on the listen stream:
 }
 ```
 
-## Test
-
-```sh
-bun test
-```
-
-Covers `server/discover` advertising the extension, and a subscriber receiving a
-`notifications/mcping/push` that round-trips through `parseMcpingNotification`.
-
 ---
 
 ## Design notes

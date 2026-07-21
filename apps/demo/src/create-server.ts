@@ -81,7 +81,6 @@ export interface DemoServer {
   fetch: (request: Request) => Promise<Response>;
   /** Push to every open subscription; returns how many were notified. */
   push: (params: McpingPushParams) => number;
-  subscriberCount: () => number;
 }
 
 export function createDemoServer(): DemoServer {
@@ -174,5 +173,5 @@ export function createDemoServer(): DemoServer {
     }
   }
 
-  return { fetch, push, subscriberCount: () => subscriptions.size };
+  return { fetch, push };
 }
