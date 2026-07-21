@@ -1,4 +1,8 @@
-import { SUBSCRIPTION_ID_META_KEY } from '@modelcontextprotocol/server';
+import {
+  JSONRPC_VERSION,
+  ProtocolErrorCode,
+  SUBSCRIPTION_ID_META_KEY,
+} from '@modelcontextprotocol/server';
 import {
   buildMcpingNotification,
   MCPING_EXTENSION_CAPABILITY,
@@ -10,14 +14,12 @@ import {
 
 export const DEMO_HOST = '127.0.0.1';
 export const DEMO_MCP_PATH = '/mcp';
+// The SDK's own LATEST_PROTOCOL_VERSION still lags at 2025-11-25, so the target
+// revision this hand-wired server serves has to be a local literal.
 const PROTOCOL_VERSION = '2026-07-28';
-const SERVER_INFO_META_KEY = 'io.modelcontextprotocol/serverInfo';
 
-const JSONRPC = '2.0';
 const HTTP_ACCEPTED = 202;
 const HTTP_METHOD_NOT_ALLOWED = 405;
-const JSONRPC_INVALID_REQUEST = -32600;
-const JSONRPC_METHOD_NOT_FOUND = -32601;
 const KEEPALIVE_MS = 15_000;
 
 const SSE_HEADERS = {
@@ -40,12 +42,12 @@ function sseFrame(frame: unknown): Uint8Array {
 }
 
 function jsonResult(args: { id: JsonRpcId; result: Record<string, unknown> }): Response {
-  return Response.json({ jsonrpc: JSONRPC, id: args.id, result: args.result });
+  return Response.json({ jsonrpc: JSONRPC_VERSION, id: args.id, result: args.result });
 }
 
 function jsonRpcError(args: { id: JsonRpcId | null; code: number; message: string }): Response {
   return Response.json({
-    jsonrpc: JSONRPC,
+    jsonrpc: JSONRPC_VERSION,
     id: args.id,
     error: { code: args.code, message: args.message },
   });
@@ -54,12 +56,12 @@ function jsonRpcError(args: { id: JsonRpcId | null; code: number; message: strin
 function discoverResult(): Record<string, unknown> {
   return {
     resultType: 'complete',
+    serverInfo: { name: 'mcping-demo', version: '0.1.0' },
     supportedVersions: [PROTOCOL_VERSION],
     // The mcping extension is declared here (spec `ServerCapabilities.extensions`),
     // so it surfaces in `server/discover`.
     capabilities: { tools: {}, extensions: MCPING_EXTENSION_CAPABILITY },
     instructions: `Subscribe via subscriptions/listen with { "push": true } (extension ${MCPING_EXTENSION_ID}) to receive ${MCPING_METHODS.push} notifications.`,
-    _meta: { [SERVER_INFO_META_KEY]: { name: 'mcping-demo', version: '0.1.0' } },
   };
 }
 
@@ -89,7 +91,7 @@ export function createDemoServer(): DemoServer {
     const built = buildMcpingNotification({ method: MCPING_METHODS.push, params });
     for (const sub of subscriptions) {
       sub.enqueue({
-        jsonrpc: JSONRPC,
+        jsonrpc: JSONRPC_VERSION,
         method: built.method,
         params: { ...built.params, _meta: { [SUBSCRIPTION_ID_META_KEY]: sub.id } },
       });
@@ -107,7 +109,7 @@ export function createDemoServer(): DemoServer {
         // Spec: the acknowledgment MUST be the first message and carries the
         // subscription id (= this request's JSON-RPC id) in `_meta`.
         enqueue({
-          jsonrpc: JSONRPC,
+          jsonrpc: JSONRPC_VERSION,
           method: 'notifications/subscriptions/acknowledged',
           params: {
             _meta: { [SUBSCRIPTION_ID_META_KEY]: id },
@@ -142,7 +144,11 @@ export function createDemoServer(): DemoServer {
       params?: { notifications?: unknown };
     } | null;
     if (!body || typeof body.method !== 'string') {
-      return jsonRpcError({ id: null, code: JSONRPC_INVALID_REQUEST, message: 'Invalid Request' });
+      return jsonRpcError({
+        id: null,
+        code: ProtocolErrorCode.InvalidRequest,
+        message: 'Invalid Request',
+      });
     }
     if (body.id === undefined) {
       return new Response(null, { status: HTTP_ACCEPTED });
@@ -162,7 +168,7 @@ export function createDemoServer(): DemoServer {
       default:
         return jsonRpcError({
           id,
-          code: JSONRPC_METHOD_NOT_FOUND,
+          code: ProtocolErrorCode.MethodNotFound,
           message: `Method not found: ${method}`,
         });
     }

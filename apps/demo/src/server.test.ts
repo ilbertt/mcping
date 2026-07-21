@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
+  PROTOCOL_VERSION_META_KEY,
+  SUBSCRIPTION_ID_META_KEY,
+} from '@modelcontextprotocol/server';
+import {
   MCPING_EXTENSION_ID,
   MCPING_METHODS,
   MCPING_SUBSCRIPTION_FILTER,
@@ -9,7 +15,6 @@ import { createDemoServer, DEMO_HOST, DEMO_MCP_PATH } from '#create-server.ts';
 
 const PROTOCOL_VERSION = '2026-07-28';
 const MCP_ENDPOINT = `http://${DEMO_HOST}${DEMO_MCP_PATH}`;
-const SUBSCRIPTION_ID_KEY = 'io.modelcontextprotocol/subscriptionId';
 
 function rpcRequest(args: {
   id: string;
@@ -31,9 +36,9 @@ function rpcRequest(args: {
       params: {
         ...args.params,
         _meta: {
-          'io.modelcontextprotocol/protocolVersion': PROTOCOL_VERSION,
-          'io.modelcontextprotocol/clientInfo': { name: 'demo-test', version: '0.0.0' },
-          'io.modelcontextprotocol/clientCapabilities': {
+          [PROTOCOL_VERSION_META_KEY]: PROTOCOL_VERSION,
+          [CLIENT_INFO_META_KEY]: { name: 'demo-test', version: '0.0.0' },
+          [CLIENT_CAPABILITIES_META_KEY]: {
             extensions: { [MCPING_EXTENSION_ID]: {} },
           },
         },
@@ -104,7 +109,7 @@ describe('demo server on the raw 2026-07-28 server SDK', () => {
 
     const ack = (await readSseFrame(reader)) as { method: string; params: Record<string, unknown> };
     expect(ack.method).toBe('notifications/subscriptions/acknowledged');
-    expect((ack.params._meta as Record<string, unknown>)[SUBSCRIPTION_ID_KEY]).toBe('sub-1');
+    expect((ack.params._meta as Record<string, unknown>)[SUBSCRIPTION_ID_META_KEY]).toBe('sub-1');
 
     const notified = server.push({ title: 'Deploy finished', body: 'prod #4821' });
     expect(notified).toBe(1);
@@ -115,7 +120,9 @@ describe('demo server on the raw 2026-07-28 server SDK', () => {
     expect(parsed?.method).toBe(MCPING_METHODS.push);
     expect(parsed?.params.title).toBe('Deploy finished');
     expect(
-      (frame as { params: { _meta: Record<string, unknown> } }).params._meta[SUBSCRIPTION_ID_KEY],
+      (frame as { params: { _meta: Record<string, unknown> } }).params._meta[
+        SUBSCRIPTION_ID_META_KEY
+      ],
     ).toBe('sub-1');
 
     await reader.cancel();

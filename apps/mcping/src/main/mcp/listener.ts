@@ -2,8 +2,10 @@ import {
   Client,
   type McpSubscription,
   type Notification,
+  SdkHttpError,
   StreamableHTTPClientTransport,
   type SubscriptionFilter,
+  UnauthorizedError,
 } from '@modelcontextprotocol/client';
 import { MCPING_EXTENSION_ID, MCPING_SUBSCRIPTION_FILTER } from '@repo/mcping-protocol';
 import { app } from 'electron';
@@ -89,14 +91,18 @@ function authEquals(options: { a: ServerAuth; b: ServerAuth }): boolean {
   return true;
 }
 
-// The SDK surfaces a transport 401 as UnauthorizedError (after our provider has
-// opened the browser); other layers may carry `code: 401`.
+// v2 surfaces auth failures as UnauthorizedError and other HTTP failures as
+// SdkHttpError, whose `.status` (not `.code`, which is an SdkErrorCode) carries
+// the HTTP status. The message check is a defensive fallback.
 function isAuthError(error: unknown): boolean {
+  if (error instanceof UnauthorizedError) {
+    return true;
+  }
+  if (error instanceof SdkHttpError && error.status === HTTP_UNAUTHORIZED) {
+    return true;
+  }
   if (!(error instanceof Error)) {
     return false;
-  }
-  if ((error as { code?: unknown }).code === HTTP_UNAUTHORIZED) {
-    return true;
   }
   return /unauthorized|authentication required|\b401\b/i.test(error.message);
 }
@@ -107,11 +113,11 @@ function isTerminalConnectError(error: unknown): boolean {
   if (isAuthError(error)) {
     return true;
   }
+  if (error instanceof SdkHttpError && error.status === HTTP_NOT_FOUND) {
+    return true;
+  }
   if (!(error instanceof Error)) {
     return false;
-  }
-  if ((error as { code?: unknown }).code === HTTP_NOT_FOUND) {
-    return true;
   }
   return /\bnot found\b|\b404\b/i.test(error.message);
 }
