@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@repo/mcping-protocol": "workspace:*",
-    "mcp-use": "catalog:"
+    "mcp-use": "catalog:",
+    "zod": "catalog:"
   }
 }

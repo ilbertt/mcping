@@ -1,90 +1,165 @@
 # demo
 
-Ping [mcping](../mcping) from your terminal. This is a tiny local MCP
-server that turns whatever you type into a notification mcping shows — the whole
-loop end-to-end, without having to write your own MCP server.
+A tiny local MCP server that emits [mcping](../mcping) push notifications — the
+whole contract end-to-end without writing your own server.
 
-## 1. Build and open mcping
+> **`beta` branch.** This build runs on `mcp-use@2` and serves the upcoming
+> **MCP 2026-07-28** (stateless) protocol. `main` keeps the stable `mcp-use@1`
+> demo. See [Design notes](#design-notes-mcp-2026-07-28) for the spec rationale
+> and the current `mcp-use@beta` limitations.
 
-Every command here uses Bun's `--filter`, which finds the workspace root on its
-own — run them from **any** directory in the repo, no `cd` needed.
+## What changed from `main`
 
-```sh
-bun install                                # first time only
-bun run --filter @repo/mcping release
-```
+The 2026-07-28 protocol is **stateless**: there are no protocol sessions and no
+persistent server→client channel, so `main`'s "type in the terminal → push to
+connected clients" loop is no longer expressible. The flow is re-centered on a
+tool call: **`run-demo-deploy`** runs a simulated deployment and produces two
+mcping `notifications/mcping/push` frames ("started" and "finished").
 
-`release` builds mcping first, then packages it, so this one command is all you
-need. Open the result:
-
-```sh
-open apps/mcping/release/mac-arm64/mcping.app
-```
-
-mcping lives in the menu bar. It auto-connects to `http://127.0.0.1:3050/mcp` —
-the address this demo server listens on — so leave its default server enabled.
-Allow notifications if macOS asks (push notifications are presentational, so no
-Accessibility permission is needed).
-
-## 2. Start the demo server
+## Run it
 
 ```sh
+bun install                          # first time only
 bun run --filter @repo/demo server
 ```
 
-It listens on `http://127.0.0.1:3050/mcp`. mcping connects within a second — watch
-its menu-bar **MCP servers** submenu turn *connected* (it also retries with
-backoff, so starting the server before or after the app both work).
-
-### Requiring authentication (optional)
-
-By default the server is open. Pass `--auth` to make it require credentials — a
-quick way to exercise mcping's auth flows end-to-end:
+The server listens on `http://127.0.0.1:3050/mcp` and serves protocol
+`2026-07-28`. Drive it with any MCP 2026-07-28 client, or over HTTP:
 
 ```sh
-bun run --filter @repo/demo server --auth apikey   # random API key
-bun run --filter @repo/demo server --auth oauth    # local OAuth server
+# server/discover → advertises supportedVersions: ["2026-07-28"]
+curl -s http://127.0.0.1:3050/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: server/discover' \
+  -d '{"jsonrpc":"2.0","id":"d","method":"server/discover","params":{"_meta":{
+       "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+       "io.modelcontextprotocol/clientInfo":{"name":"probe","version":"0.0.0"},
+       "io.modelcontextprotocol/clientCapabilities":{}}}}'
+
+# tools/call run-demo-deploy → result.structuredContent.pushes = two mcping pushes
+curl -s http://127.0.0.1:3050/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: tools/call' -H 'Mcp-Name: run-demo-deploy' \
+  -d '{"jsonrpc":"2.0","id":"c","method":"tools/call","params":{"name":"run-demo-deploy",
+       "arguments":{"service":"api"},"_meta":{
+       "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+       "io.modelcontextprotocol/clientInfo":{"name":"probe","version":"0.0.0"},
+       "io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-- **`apikey`** prints a random key (a `crypto.randomUUID()`) on startup. In
-  mcping, open the server's auth settings, choose the **X-API-Key** header, and
-  paste the key.
-- **`oauth`** starts a throwaway local authorization server on
-  `http://127.0.0.1:3051`. In mcping, set the auth type to **OAuth** and click
-  **Connect**; your browser opens briefly to complete authorization and the token
-  flows back automatically. It verifies nothing and protects nothing — it exists
-  only to drive mcping's OAuth path locally.
+Every request on 2026-07-28 carries its own `_meta` envelope
+(`io.modelcontextprotocol/protocolVersion` + `clientCapabilities` are required,
+`clientInfo` is enforced by `mcp-use`) — there is no `initialize` handshake.
 
-## 3. Ping yourself
-
-At the `> ` prompt, type a message and press Enter:
-
-```
-> Deploy finished — take a look
->
-```
-
-Each line becomes a **push** notification; mcping shows it as a native system
-notification with your text as the title.
-
-## How it works
+## The contract
 
 The server and mcping share one contract —
-[`@repo/mcping-protocol`](../../packages/mcping-protocol). `src/server.ts` builds a
-push notification with that package's `buildPushNotification` helper and sends it
-over its MCP notification channel; mcping validates the same schema with
-`parseMcpingNotification` and shows a native system notification.
-
-The wire message (the transport adds `jsonrpc`):
+[`@repo/mcping-protocol`](../../packages/mcping-protocol). `run-demo-deploy`
+builds each push with that package's `buildMcpingNotification`; a client
+validates the same schema with `parseMcpingNotification`. The wire frame (the
+transport adds `jsonrpc`, never an `id`):
 
 ```jsonc
 {
   "jsonrpc": "2.0",
   "method": "notifications/mcping/push",
-  "params": { "title": "Deploy finished — take a look" }
+  "params": { "title": "Deployed api", "body": "Deployment finished", "priority": "normal" }
 }
 ```
 
-`push` is presentational. Alongside `title` it also carries an optional `body`,
-`subtitle`, `priority` (`low` | `normal` | `critical`), and `silent` — the demo
-sends only the title; see [`src/server.ts`](./src/server.ts) to send the rest.
+`push` is presentational: alongside `title` it carries optional `body`,
+`subtitle`, `priority` (`low` | `normal` | `critical`), and `silent`.
+
+## Test
+
+```sh
+bun test
+```
+
+Covers the protocol round-trip/parse, `server/discover` advertising
+`2026-07-28`, the extension-id validity, the tool `_meta` association, the
+`extensions`-capability gap (as a tripwire), and the end-to-end push validated by
+`parseMcpingNotification`.
+
+---
+
+## Design notes (MCP 2026-07-28)
+
+Every decision below traces to the live draft, read at implementation time —
+spec index <https://modelcontextprotocol.io/specification/draft>, `_meta`/
+extension rules `basic/index#meta` + [extensions/overview](https://modelcontextprotocol.io/extensions/overview),
+subscriptions `basic/patterns/subscriptions`, transport
+`basic/transports/streamable-http`, and the authoritative
+`schema/draft/schema.ts`.
+
+### Resolved versions
+
+- `mcp-use` → **`2.0.0-beta.22`** (the `@beta` dist-tag), pinned exactly in the
+  root catalog and `bun.lock` — no floating tag.
+- It pulls the split v2 SDK `@modelcontextprotocol/{server,client,core}`
+  (`2.0.0-beta.4`), which is ESM-only.
+
+### How 2026-07-28 is enabled
+
+Not a flag — it is what the v2 stack serves. `mcp-use@2` builds a fresh SDK
+`McpServer` per request over a session-less Streamable HTTP transport (the
+stateless model), so `getHandler()` answers `server/discover` with
+`supportedVersions: ["2026-07-28"]` and validates per-request `_meta` envelopes.
+Legacy `2025-11-25` traffic is still answered from the same endpoint
+(`ServerConfig.legacy`, default `"stateless"`).
+
+### Extension identifier — `io.github.ilbertt/mcping`
+
+Valid and **non-reserved**: an identifier's prefix is reserved for MCP only when
+its **second label** is `modelcontextprotocol` or `mcp` (`basic/index#meta`).
+Here the labels are `[io, github, ilbertt]` — second label `github` — so it is a
+normal third-party ID (`github` reverses the GitHub Pages domain
+`ilbertt.github.io`). The rule is encoded and tested in
+[`src/extension.ts`](./src/extension.ts) (`isValidThirdPartyExtensionId`). Note
+the notification **method** name stays a plain `notifications/…` string
+(`notifications/mcping/push`, mirroring Tasks' `notifications/tasks`); reverse-DNS
+prefixing applies to identifiers and `_meta`/capability keys, not method names.
+
+### Why the push is delivered inline, not via `subscriptions/listen`
+
+`subscriptions/listen` is **closed**, confirmed from the schema — its
+`notifications` parameter is a fixed `SubscriptionFilter` struct with exactly
+`toolsListChanged` / `promptsListChanged` / `resourcesListChanged` /
+`resourceSubscriptions`, and "the server MUST NOT send notification types the
+client has not explicitly requested." There is no open map for a third party to
+register `notifications/mcping/push`. The spec-sanctioned alternative
+(`basic/transports/streamable-http`, "Receiving Messages") is a **request-scoped
+notification on a tool call's own SSE response stream**: the server MAY send
+notifications before the final response, and they MUST relate to that request.
+So `run-demo-deploy` is the delivery vehicle.
+
+### `mcp-use@beta` limitations (reported, not worked around)
+
+The underlying `@modelcontextprotocol/server` SDK supports both of the following;
+`mcp-use@beta`'s wrapper does not surface them, so — per the brief — they are
+**reported rather than hacked around**:
+
+1. **No custom `extensions` capability.** `mcp-use` hardcodes its server
+   capabilities (`logging`/`tools`/`prompts`/`resources`) with no config
+   passthrough, so `io.github.ilbertt/mcping` cannot appear in `server/discover`.
+   Verified on the wire (the `KNOWN GAP` test asserts `capabilities.extensions`
+   is absent, as a tripwire). The intended declaration lives in
+   [`src/extension.ts`](./src/extension.ts) (`MCPING_EXTENSION_CAPABILITY`) and is
+   mirrored onto the tool's vendor-namespaced `_meta` — the closest
+   spec-legitimate surface `mcp-use` does expose.
+2. **No generic notification sender.** The per-request context exposes only
+   `reportProgress` (`notifications/progress`) and `sendLog`
+   (`notifications/message`); there is no `sendNotification(method, params)`, so
+   the exact `notifications/mcping/push` frame cannot be put on the wire. The demo
+   therefore builds the two real pushes with `@repo/mcping-protocol`, streams the
+   milestones via `reportProgress` (the spec-sanctioned inline channel), and
+   returns the built frames in `structuredContent` so a client validates them
+   with `parseMcpingNotification`. The build→wire→parse contract runs end to end;
+   only the final custom-method frame emission is blocked.
+
+Consequence: because the stateless model removed protocol sessions and
+`mcp-use@beta` removed `sendNotification` / `getActiveSessions` / `server.app`,
+`main`'s unsolicited-broadcast demo and its `--auth` modes don't port as-is; auth
+is deferred on this spike (`main` keeps it).
