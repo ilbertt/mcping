@@ -27,8 +27,8 @@
     "#*": "./src/*"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.0.0-beta.4",
     "@repo/mcping-protocol": "workspace:*",
-    "electron-store": "^11.0.2",
-    "mcp-use": "catalog:"
+    "electron-store": "^11.0.2"
   }
 }

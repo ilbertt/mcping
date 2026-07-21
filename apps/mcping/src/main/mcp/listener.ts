@@ -1,7 +1,13 @@
-import { shell } from 'electron';
-import type { NodeOAuthClientProvider } from 'mcp-use/auth/node';
-import { MCPClient } from 'mcp-use/client';
-import { completeAuthorization, createOauthProvider } from '#main/auth/oauth.ts';
+import {
+  Client,
+  type McpSubscription,
+  type Notification,
+  StreamableHTTPClientTransport,
+  type SubscriptionFilter,
+} from '@modelcontextprotocol/client';
+import { MCPING_EXTENSION_ID, MCPING_SUBSCRIPTION_FILTER } from '@repo/mcping-protocol';
+import { app } from 'electron';
+import { McpingOAuthProvider } from '#main/auth/oauth.ts';
 import { handleNotification } from '#main/mcp/notification-handler.ts';
 import { secretStore } from '#main/stores/secret-store.ts';
 import { getSettings } from '#main/stores/settings-store.ts';
@@ -11,7 +17,7 @@ import type { ServerAuth } from '#shared/auth.ts';
 import type { ConnectionStatus, ServerStatus } from '#shared/connection.ts';
 import type { McpServer } from '#shared/server.ts';
 
-const SESSION_KEY = 'server';
+const CLIENT_NAME = 'mcping';
 const MS_PER_SECOND = 1000;
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30_000;
@@ -24,40 +30,52 @@ const HTTP_NOT_FOUND = 404;
 const AUTH_REQUIRED_DETAIL = 'Authorization required — click Connect';
 const AWAITING_AUTH_DETAIL = 'Waiting for browser authorization…';
 
-interface HttpServerConfig {
-  url: string;
-  authToken?: string;
-  headers?: Record<string, string>;
-  authProvider?: NodeOAuthClientProvider;
+// The mcping extension merges `{ push: true }` into the subscriptions/listen
+// filter; the core filter type has no such field, so widen it at the boundary.
+const MCPING_LISTEN_FILTER = MCPING_SUBSCRIPTION_FILTER as unknown as SubscriptionFilter;
+
+interface LiveClient {
+  client: Client;
+  transport: StreamableHTTPClientTransport;
+  subscription: McpSubscription;
 }
 
-// Map a server's auth mode onto the credential fields mcp-use forwards to the
-// transport. Secrets are read from the keychain-backed store here and never live
-// in the persisted server config.
-function buildServerConfig(options: {
+function newClient(): Client {
+  return new Client(
+    { name: CLIENT_NAME, version: app.getVersion() },
+    {
+      // Declare the mcping extension in per-request client capabilities so a
+      // server knows this client wants its pushes.
+      capabilities: { extensions: { [MCPING_EXTENSION_ID]: {} } },
+      // Negotiate the modern (2026-07-28) era via server/discover, falling back
+      // to the 2025 initialize handshake for legacy servers.
+      versionNegotiation: { mode: 'auto' },
+    },
+  );
+}
+
+function buildTransport(options: {
   server: McpServer;
-  oauthProvider: NodeOAuthClientProvider | null;
-}): HttpServerConfig {
+  oauthProvider: McpingOAuthProvider | null;
+}): StreamableHTTPClientTransport {
   const { server, oauthProvider } = options;
-  const config: HttpServerConfig = { url: server.url };
+  const url = new URL(server.url);
   switch (server.auth.type) {
     case 'header': {
       const value = secretStore.get(server.id);
-      if (value) {
-        config.headers = { [server.auth.name]: value };
-      }
-      break;
+      return new StreamableHTTPClientTransport(
+        url,
+        value ? { requestInit: { headers: { [server.auth.name]: value } } } : undefined,
+      );
     }
-    case 'oauth': {
-      if (oauthProvider) {
-        config.authProvider = oauthProvider;
-      }
-      break;
-    }
-    case 'none':
-      break;
+    case 'oauth':
+      return new StreamableHTTPClientTransport(
+        url,
+        oauthProvider ? { authProvider: oauthProvider } : undefined,
+      );
+    default:
+      return new StreamableHTTPClientTransport(url);
   }
-  return config;
 }
 
 function authEquals(options: { a: ServerAuth; b: ServerAuth }): boolean {
@@ -71,8 +89,8 @@ function authEquals(options: { a: ServerAuth; b: ServerAuth }): boolean {
   return true;
 }
 
-// mcp-use collapses a transport 401 into a generic Error carrying `code: 401`
-// (after the SDK has already opened the browser via our provider).
+// The SDK surfaces a transport 401 as UnauthorizedError (after our provider has
+// opened the browser); other layers may carry `code: 401`.
 function isAuthError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -83,9 +101,8 @@ function isAuthError(error: unknown): boolean {
   return /unauthorized|authentication required|\b401\b/i.test(error.message);
 }
 
-// Auth failures and 404s are terminal: retrying the connection can't fix a
-// missing endpoint or rejected credentials, so we surface the error and stop
-// the reconnect/ping loop instead of backing off forever.
+// Auth failures and 404s are terminal: retrying can't fix a missing endpoint or
+// rejected credentials, so we surface the error and stop the reconnect loop.
 function isTerminalConnectError(error: unknown): boolean {
   if (isAuthError(error)) {
     return true;
@@ -99,35 +116,17 @@ function isTerminalConnectError(error: unknown): boolean {
   return /\bnot found\b|\b404\b/i.test(error.message);
 }
 
-// mcp-use exposes no ping helper and its raw `request` hands the SDK an
-// undefined result schema (which throws while parsing every response), so reach
-// the underlying MCP SDK client. Its `ping` is a protocol-level liveness probe
-// that every server answers regardless of the tools or resources it exposes —
-// unlike `listTools`, which a notification-only server may reject outright.
-interface PingClient {
-  ping: (options: { timeout: number }) => Promise<unknown>;
-}
-
-function getPingClient(client: MCPClient | null): PingClient | null {
-  const session = client?.getSession(SESSION_KEY);
-  if (!session) {
-    return null;
-  }
-  const connector = session.connector as unknown as { client: PingClient | null };
-  return connector.client;
-}
-
 class ServerConnection {
   private server: McpServer;
   private readonly onStatus: (status: ConnectionStatus) => void;
-  private client: MCPClient | null = null;
+  private live: LiveClient | null = null;
   private status: ConnectionStatus = { state: 'disconnected' };
   private desiredConnected = false;
   private backoffMs = INITIAL_BACKOFF_MS;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private healthTimer: NodeJS.Timeout | null = null;
   private healthCheckInFlight = false;
-  private oauthProvider: NodeOAuthClientProvider | null = null;
+  private oauthProvider: McpingOAuthProvider | null = null;
   private oauthProviderUrl: string | null = null;
   // Only a user-initiated connect may open the browser; silent reconnects must
   // not hijack it, so they surface "authorization required" instead.
@@ -160,6 +159,11 @@ class ServerConnection {
     this.onStatus(next);
   }
 
+  private handleServerNotification(notification: Notification): Promise<void> {
+    handleNotification({ notification, server: this.server });
+    return Promise.resolve();
+  }
+
   private clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -176,17 +180,19 @@ class ServerConnection {
 
   private async disposeClient(): Promise<void> {
     this.stopHealthCheck();
-    if (this.client) {
-      const closing = this.client;
-      this.client = null;
-      try {
-        await closing.closeAllSessions();
-      } catch (error) {
-        log({
-          level: 'warn',
-          message: `[${this.server.name}] Error closing sessions: ${String(error)}`,
-        });
-      }
+    const live = this.live;
+    this.live = null;
+    if (!live) {
+      return;
+    }
+    try {
+      await live.subscription.close();
+      await live.client.close();
+    } catch (error) {
+      log({
+        level: 'warn',
+        message: `[${this.server.name}] Error closing connection: ${String(error)}`,
+      });
     }
   }
 
@@ -218,15 +224,14 @@ class ServerConnection {
     if (this.healthCheckInFlight || !this.desiredConnected || this.status.state !== 'connected') {
       return;
     }
-    const client = getPingClient(this.client);
-    if (!client) {
+    const live = this.live;
+    if (!live) {
       return;
     }
     this.healthCheckInFlight = true;
     try {
-      await client.ping({ timeout: HEALTH_CHECK_TIMEOUT_MS });
+      await live.client.ping({ timeout: HEALTH_CHECK_TIMEOUT_MS });
     } catch (error) {
-      // Bail if a disconnect/reconnect raced ahead while the ping was in flight.
       if (!this.desiredConnected || this.status.state !== 'connected') {
         return;
       }
@@ -257,14 +262,13 @@ class ServerConnection {
     this.oauthProviderUrl = null;
   }
 
-  private async getOauthProvider(): Promise<NodeOAuthClientProvider> {
+  private async getOauthProvider(): Promise<McpingOAuthProvider> {
     if (this.oauthProvider && this.oauthProviderUrl === this.server.url) {
       return this.oauthProvider;
     }
     this.disposeOauthProvider();
-    this.oauthProvider = await createOauthProvider({
+    this.oauthProvider = await McpingOAuthProvider.create({
       serverId: this.server.id,
-      url: this.server.url,
       openBrowser: (url) => this.openAuthUrl(url),
     });
     this.oauthProviderUrl = this.server.url;
@@ -275,30 +279,29 @@ class ServerConnection {
     if (!this.interactiveAuth) {
       return;
     }
+    const { shell } = await import('electron');
     await shell.openExternal(url);
   }
 
-  private async createClientSession(
-    oauthProvider: NodeOAuthClientProvider | null,
-  ): Promise<MCPClient> {
-    const serverConfig = buildServerConfig({ server: this.server, oauthProvider });
-    const client = new MCPClient(
-      { mcpServers: { [SESSION_KEY]: serverConfig } },
-      {
-        onNotification: (notification) => handleNotification({ notification, server: this.server }),
-      },
-    );
-    try {
-      await client.createSession(SESSION_KEY);
-      return client;
-    } catch (error) {
-      await client.closeAllSessions().catch(() => undefined);
-      throw error;
-    }
+  // Open a fresh connection: connect the transport, then open the mcping
+  // subscription so the server can push `notifications/mcping/push` on it.
+  private async open(oauthProvider: McpingOAuthProvider | null): Promise<LiveClient> {
+    const client = newClient();
+    client.fallbackNotificationHandler = (notification) =>
+      this.handleServerNotification(notification);
+    const transport = buildTransport({ server: this.server, oauthProvider });
+    await client.connect(transport);
+    const subscription = await client.listen(MCPING_LISTEN_FILTER);
+    void subscription.closed.then((reason) => {
+      if (reason === 'remote' && this.live?.subscription === subscription) {
+        void this.reconnectAfterDrop();
+      }
+    });
+    return { client, transport, subscription };
   }
 
-  private onConnected(client: MCPClient): void {
-    this.client = client;
+  private onConnected(live: LiveClient): void {
+    this.live = live;
     this.backoffMs = INITIAL_BACKOFF_MS;
     this.setStatus({ state: 'connected', detail: this.server.url });
     log({ level: 'info', message: `[${this.server.name}] Connected` });
@@ -315,14 +318,11 @@ class ServerConnection {
     }
   }
 
-  // The SDK opened the browser and bound the loopback before the 401 surfaced.
-  // If this attempt is interactive, finish the flow and reconnect; otherwise
-  // cancel it and ask the user to reconnect — auth is not a transient failure,
-  // so we don't schedule a backoff retry.
-  private async handleAuthError(provider: NodeOAuthClientProvider): Promise<void> {
-    if (!this.interactiveAuth || !provider.hasPendingFlow) {
-      // Drop the provider (closing its loopback) and clear the cache so the next
-      // user-initiated Connect builds a fresh one rather than reusing this one.
+  // The transport opened the browser and bound the loopback before the 401
+  // surfaced. If interactive, capture the redirect, finish the token exchange,
+  // and reconnect; otherwise ask the user to reconnect.
+  private async handleAuthError(provider: McpingOAuthProvider): Promise<void> {
+    if (!this.interactiveAuth) {
       this.disposeOauthProvider();
       log({ level: 'warn', message: `[${this.server.name}] Authorization required` });
       this.setStatus({ state: 'error', detail: AUTH_REQUIRED_DETAIL });
@@ -331,9 +331,10 @@ class ServerConnection {
     }
     this.setStatus({ state: 'connecting', detail: AWAITING_AUTH_DETAIL });
     try {
-      const code = await provider.getAuthorizationCode();
-      await completeAuthorization({ provider, url: this.server.url, code });
-      this.onConnected(await this.createClientSession(provider));
+      const params = await provider.awaitCallback();
+      const transport = buildTransport({ server: this.server, oauthProvider: provider });
+      await transport.finishAuth(params);
+      this.onConnected(await this.open(provider));
     } catch (error) {
       await this.onConnectError(error);
     }
@@ -346,12 +347,12 @@ class ServerConnection {
     const { url, name } = this.server;
     this.setStatus({ state: 'connecting', detail: url });
     log({ level: 'info', message: `[${name}] Connecting to ${url}` });
-    let provider: NodeOAuthClientProvider | null = null;
+    let provider: McpingOAuthProvider | null = null;
     try {
       if (this.server.auth.type === 'oauth') {
         provider = await this.getOauthProvider();
       }
-      this.onConnected(await this.createClientSession(provider));
+      this.onConnected(await this.open(provider));
     } catch (error) {
       if (provider && isAuthError(error)) {
         await this.handleAuthError(provider);
@@ -410,9 +411,7 @@ export function getStatuses(): ServerStatus[] {
   }));
 }
 
-// Reconcile the connection registry against the persisted server list: create
-// connections for new servers, dispose those whose server was removed, and push
-// config changes into the rest.
+// Reconcile the connection registry against the persisted server list.
 export function syncServers(): void {
   const { servers } = getSettings();
   const desiredIds = new Set(servers.map((server) => server.id));
@@ -449,8 +448,7 @@ export async function disconnectServer(serverId: string): Promise<void> {
   await connections.get(serverId)?.disconnect();
 }
 
-// A credential changed under a live connection: reconnect so the new secret
-// takes effect.
+// A credential changed under a live connection: reconnect so it takes effect.
 export function reconnectIfActive(serverId: string): void {
   const connection = connections.get(serverId);
   if (connection?.isActive()) {

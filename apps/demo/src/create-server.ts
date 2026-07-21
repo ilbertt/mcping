@@ -1,80 +1,172 @@
-import { buildMcpingNotification, MCPING_METHODS } from '@repo/mcping-protocol';
-import { MCPServer } from 'mcp-use';
-import { z } from 'zod';
-import { MCPING_EXTENSION_ID } from '#extension.ts';
+import { SUBSCRIPTION_ID_META_KEY } from '@modelcontextprotocol/server';
+import {
+  buildMcpingNotification,
+  MCPING_EXTENSION_CAPABILITY,
+  MCPING_EXTENSION_ID,
+  MCPING_METHODS,
+  type McpingPushParams,
+  McpingSubscriptionFilterSchema,
+} from '@repo/mcping-protocol';
 
-// Not "localhost": mcping addresses the server by its IPv4 URL, and a default
-// bind can resolve IPv6-only, leaving it unreachable.
 export const DEMO_HOST = '127.0.0.1';
 export const DEMO_MCP_PATH = '/mcp';
-export const DEMO_DEPLOY_TOOL = 'run-demo-deploy';
+const PROTOCOL_VERSION = '2026-07-28';
+const SERVER_INFO_META_KEY = 'io.modelcontextprotocol/serverInfo';
 
-// A deploy reaches two milestones; each is reported as request-scoped progress.
-const DEPLOY_STEP_STARTED = 1;
-const DEPLOY_STEP_FINISHED = 2;
-const DEPLOY_TOTAL_STEPS = 2;
+const JSONRPC = '2.0';
+const HTTP_ACCEPTED = 202;
+const HTTP_METHOD_NOT_ALLOWED = 405;
+const JSONRPC_INVALID_REQUEST = -32600;
+const JSONRPC_METHOD_NOT_FOUND = -32601;
+const KEEPALIVE_MS = 15_000;
 
-const runDemoDeployInput = z.object({
-  service: z.string().min(1).default('demo-service').describe('Name of the service being deployed'),
-});
+const SSE_HEADERS = {
+  'content-type': 'text/event-stream',
+  'cache-control': 'no-cache',
+  'x-accel-buffering': 'no',
+} as const;
+
+const encoder = new TextEncoder();
+
+type JsonRpcId = string | number;
+
+interface OpenSubscription {
+  id: JsonRpcId;
+  enqueue: (frame: unknown) => void;
+}
+
+function sseFrame(frame: unknown): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(frame)}\n\n`);
+}
+
+function jsonResult(args: { id: JsonRpcId; result: Record<string, unknown> }): Response {
+  return Response.json({ jsonrpc: JSONRPC, id: args.id, result: args.result });
+}
+
+function jsonRpcError(args: { id: JsonRpcId | null; code: number; message: string }): Response {
+  return Response.json({
+    jsonrpc: JSONRPC,
+    id: args.id,
+    error: { code: args.code, message: args.message },
+  });
+}
+
+function discoverResult(): Record<string, unknown> {
+  return {
+    resultType: 'complete',
+    supportedVersions: [PROTOCOL_VERSION],
+    // The mcping extension is declared here (spec `ServerCapabilities.extensions`),
+    // so it surfaces in `server/discover`.
+    capabilities: { tools: {}, extensions: MCPING_EXTENSION_CAPABILITY },
+    instructions: `Subscribe via subscriptions/listen with { "push": true } (extension ${MCPING_EXTENSION_ID}) to receive ${MCPING_METHODS.push} notifications.`,
+    _meta: { [SERVER_INFO_META_KEY]: { name: 'mcping-demo', version: '0.1.0' } },
+  };
+}
 
 /**
- * The stateless (2026-07-28) demo MCP server, configured with the
- * `run-demo-deploy` tool. Split from the entrypoint so tests can drive
- * `getHandler()` without binding a socket.
+ * A minimal, hand-wired stateless MCP server (protocol revision 2026-07-28).
+ *
+ * It exists because no server library at this beta stage can publish a custom
+ * extension notification on a `subscriptions/listen` stream — `createMcpHandler`
+ * drives that stream from a closed four-event bus. So the demo drives the listen
+ * stream directly: it declares the mcping extension in `server/discover`, and
+ * when a client opens `subscriptions/listen` with the mcping opt-in
+ * (`{ push: true }`), the server acknowledges it and pushes
+ * `notifications/mcping/push` frames on that long-lived stream — the display-only
+ * receive path, no tool call involved.
  */
-export function createDemoServer(): MCPServer {
-  const server = new MCPServer({
-    name: 'mcping-demo',
-    version: '0.1.0',
-    description:
-      'Stateless MCP server (2026-07-28) that emits mcping pushes from a demo deploy tool',
-    instructions: `Call the \`${DEMO_DEPLOY_TOOL}\` tool to run a simulated deployment. It reports request-scoped progress and returns the mcping "${MCPING_METHODS.push}" notifications it produced (extension ${MCPING_EXTENSION_ID}).`,
-    host: DEMO_HOST,
-    basePath: DEMO_MCP_PATH,
-    // Drop mcp-use's per-request log lines and banners so the demo output stays clean.
-    logging: { enabled: false },
-  });
+export interface DemoServer {
+  fetch: (request: Request) => Promise<Response>;
+  /** Push to every open subscription; returns how many were notified. */
+  push: (params: McpingPushParams) => number;
+  subscriberCount: () => number;
+}
 
-  server.tool(
-    {
-      name: DEMO_DEPLOY_TOOL,
-      description: 'Run a simulated deployment that emits an mcping "started" and "finished" push.',
-      inputSchema: runDemoDeployInput,
-      // The spec's home for the extension association is the server's `extensions`
-      // capability (server/discover). mcp-use@beta exposes no passthrough for that
-      // map (see the demo README, "Design notes"), so we surface the association
-      // here in the tool descriptor's vendor-namespaced `_meta` — itself spec-legitimate.
-      _meta: { [MCPING_EXTENSION_ID]: { notification: MCPING_METHODS.push } },
-    },
-    // biome-ignore lint/complexity/useMaxParams: mcp-use tool callbacks are (params, context).
-    async ({ service }, ctx) => {
-      // The push wire frame (`notifications/mcping/push`) cannot be emitted through
-      // mcp-use@beta (no generic notification API — see the demo README). We deliver
-      // the two milestones over the one request-scoped channel mcp-use does expose,
-      // `reportProgress` (the spec-sanctioned inline path), and return the fully
-      // built pushes so a client validates them with `parseMcpingNotification`.
-      const started = buildMcpingNotification({
-        method: MCPING_METHODS.push,
-        params: { title: `Deploying ${service}…`, body: 'Deployment started', priority: 'normal' },
+export function createDemoServer(): DemoServer {
+  const subscriptions = new Set<OpenSubscription>();
+
+  function push(params: McpingPushParams): number {
+    const built = buildMcpingNotification({ method: MCPING_METHODS.push, params });
+    for (const sub of subscriptions) {
+      sub.enqueue({
+        jsonrpc: JSONRPC,
+        method: built.method,
+        params: { ...built.params, _meta: { [SUBSCRIPTION_ID_META_KEY]: sub.id } },
       });
-      await ctx.reportProgress(DEPLOY_STEP_STARTED, DEPLOY_TOTAL_STEPS, started.params.title);
+    }
+    return subscriptions.size;
+  }
 
-      const finished = buildMcpingNotification({
-        method: MCPING_METHODS.push,
-        params: { title: `Deployed ${service}`, body: 'Deployment finished', priority: 'normal' },
-      });
-      await ctx.reportProgress(DEPLOY_STEP_FINISHED, DEPLOY_TOTAL_STEPS, finished.params.title);
+  function openListenStream(args: { id: JsonRpcId; wantsPush: boolean }): Response {
+    const { id, wantsPush } = args;
+    let sub: OpenSubscription | undefined;
+    let keepAlive: ReturnType<typeof setInterval> | undefined;
+    const stream = new ReadableStream({
+      start(controller) {
+        const enqueue = (frame: unknown): void => controller.enqueue(sseFrame(frame));
+        // Spec: the acknowledgment MUST be the first message and carries the
+        // subscription id (= this request's JSON-RPC id) in `_meta`.
+        enqueue({
+          jsonrpc: JSONRPC,
+          method: 'notifications/subscriptions/acknowledged',
+          params: {
+            _meta: { [SUBSCRIPTION_ID_META_KEY]: id },
+            notifications: wantsPush ? { push: true } : {},
+          },
+        });
+        if (wantsPush) {
+          sub = { id, enqueue };
+          subscriptions.add(sub);
+        }
+        keepAlive = setInterval(() => controller.enqueue(encoder.encode(':\n\n')), KEEPALIVE_MS);
+      },
+      cancel() {
+        if (keepAlive !== undefined) {
+          clearInterval(keepAlive);
+        }
+        if (sub) {
+          subscriptions.delete(sub);
+        }
+      },
+    });
+    return new Response(stream, { headers: SSE_HEADERS });
+  }
 
-      const pushes = [started, finished];
-      return {
-        content: [
-          { type: 'text', text: `Emitted ${pushes.length} mcping pushes for "${service}".` },
-        ],
-        structuredContent: { service, pushes },
-      };
-    },
-  );
+  async function fetch(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: HTTP_METHOD_NOT_ALLOWED });
+    }
+    const body = (await request.json().catch(() => null)) as {
+      id?: JsonRpcId;
+      method?: string;
+      params?: { notifications?: unknown };
+    } | null;
+    if (!body || typeof body.method !== 'string') {
+      return jsonRpcError({ id: null, code: JSONRPC_INVALID_REQUEST, message: 'Invalid Request' });
+    }
+    if (body.id === undefined) {
+      return new Response(null, { status: HTTP_ACCEPTED });
+    }
+    const { id, method } = body;
+    switch (method) {
+      case 'server/discover':
+        return jsonResult({ id, result: discoverResult() });
+      case 'tools/list':
+        return jsonResult({ id, result: { resultType: 'complete', tools: [] } });
+      case 'ping':
+        return jsonResult({ id, result: {} });
+      case 'subscriptions/listen': {
+        const parsed = McpingSubscriptionFilterSchema.safeParse(body.params?.notifications ?? {});
+        return openListenStream({ id, wantsPush: parsed.success && parsed.data.push === true });
+      }
+      default:
+        return jsonRpcError({
+          id,
+          code: JSONRPC_METHOD_NOT_FOUND,
+          message: `Method not found: ${method}`,
+        });
+    }
+  }
 
-  return server;
+  return { fetch, push, subscriberCount: () => subscriptions.size };
 }

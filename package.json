@@ -18,7 +18,6 @@
       "packages/*"
     ],
     "catalog": {
-      "mcp-use": "2.0.0-beta.22",
       "typescript": "^7.0.2",
       "zod": "^4.2.0"
     }

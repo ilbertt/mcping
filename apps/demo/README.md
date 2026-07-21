@@ -1,20 +1,25 @@
 # demo
 
-A tiny local MCP server that emits [mcping](../mcping) push notifications — the
-whole contract end-to-end without writing your own server.
+A tiny local MCP server that pushes [mcping](../mcping) notifications over the
+upcoming **MCP 2026-07-28** (stateless) protocol — the whole extension flow
+end-to-end.
 
-> **`beta` branch.** This build runs on `mcp-use@2` and serves the upcoming
-> **MCP 2026-07-28** (stateless) protocol. `main` keeps the stable `mcp-use@1`
-> demo. See [Design notes](#design-notes-mcp-2026-07-28) for the spec rationale
-> and the current `mcp-use@beta` limitations.
+> **`beta` branch.** `main` runs the stable `mcp-use@1` demo. This branch serves
+> 2026-07-28 and delivers pushes through the mcping extension's
+> `subscriptions/listen` subscription. See [Design notes](#design-notes) for why
+> it's hand-wired on the raw SDK.
 
-## What changed from `main`
+## The flow
 
-The 2026-07-28 protocol is **stateless**: there are no protocol sessions and no
-persistent server→client channel, so `main`'s "type in the terminal → push to
-connected clients" loop is no longer expressible. The flow is re-centered on a
-tool call: **`run-demo-deploy`** runs a simulated deployment and produces two
-mcping `notifications/mcping/push` frames ("started" and "finished").
+1. A client calls `server/discover` and sees the server advertises the
+   `io.github.ilbertt/mcping` extension in `capabilities.extensions`.
+2. The client opens a `subscriptions/listen` stream with the mcping opt-in
+   (`{ "notifications": { "push": true } }`).
+3. The server acknowledges, then pushes `notifications/mcping/push` frames on
+   that long-lived stream. The client stays **display-only** — it never calls a
+   tool.
+
+Each line you type in the server terminal becomes a push to every subscriber.
 
 ## Run it
 
@@ -23,54 +28,39 @@ bun install                          # first time only
 bun run --filter @repo/demo server
 ```
 
-The server listens on `http://127.0.0.1:3050/mcp` and serves protocol
-`2026-07-28`. Drive it with any MCP 2026-07-28 client, or over HTTP:
+Listens on `http://127.0.0.1:3050/mcp`. Try it with curl:
 
 ```sh
-# server/discover → advertises supportedVersions: ["2026-07-28"]
-curl -s http://127.0.0.1:3050/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: server/discover' \
-  -d '{"jsonrpc":"2.0","id":"d","method":"server/discover","params":{"_meta":{
-       "io.modelcontextprotocol/protocolVersion":"2026-07-28",
-       "io.modelcontextprotocol/clientInfo":{"name":"probe","version":"0.0.0"},
-       "io.modelcontextprotocol/clientCapabilities":{}}}}'
+# server/discover → advertises the extension
+curl -s http://127.0.0.1:3050/mcp -H 'content-type: application/json' \
+  -H 'mcp-method: server/discover' \
+  -d '{"jsonrpc":"2.0","id":"d","method":"server/discover","params":{}}'
 
-# tools/call run-demo-deploy → result.structuredContent.pushes = two mcping pushes
-curl -s http://127.0.0.1:3050/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: tools/call' -H 'Mcp-Name: run-demo-deploy' \
-  -d '{"jsonrpc":"2.0","id":"c","method":"tools/call","params":{"name":"run-demo-deploy",
-       "arguments":{"service":"api"},"_meta":{
-       "io.modelcontextprotocol/protocolVersion":"2026-07-28",
-       "io.modelcontextprotocol/clientInfo":{"name":"probe","version":"0.0.0"},
-       "io.modelcontextprotocol/clientCapabilities":{}}}}'
+# subscribe (streams the ack, then pushes as you type in the server terminal)
+curl -sN http://127.0.0.1:3050/mcp -H 'content-type: application/json' \
+  -H 'mcp-method: subscriptions/listen' \
+  -d '{"jsonrpc":"2.0","id":"sub-1","method":"subscriptions/listen","params":{"notifications":{"push":true}}}'
 ```
-
-Every request on 2026-07-28 carries its own `_meta` envelope
-(`io.modelcontextprotocol/protocolVersion` + `clientCapabilities` are required,
-`clientInfo` is enforced by `mcp-use`) — there is no `initialize` handshake.
 
 ## The contract
 
 The server and mcping share one contract —
-[`@repo/mcping-protocol`](../../packages/mcping-protocol). `run-demo-deploy`
-builds each push with that package's `buildMcpingNotification`; a client
-validates the same schema with `parseMcpingNotification`. The wire frame (the
-transport adds `jsonrpc`, never an `id`):
+[`@repo/mcping-protocol`](../../packages/mcping-protocol). The server builds each
+push with `buildMcpingNotification`; a client validates it with
+`parseMcpingNotification`. The subscription opt-in field (`{ push: true }`) and
+the extension identity also live there. The wire frame on the listen stream:
 
 ```jsonc
 {
   "jsonrpc": "2.0",
   "method": "notifications/mcping/push",
-  "params": { "title": "Deployed api", "body": "Deployment finished", "priority": "normal" }
+  "params": {
+    "title": "Deploy finished",
+    "body": "prod #4821",
+    "_meta": { "io.modelcontextprotocol/subscriptionId": "sub-1" }
+  }
 }
 ```
-
-`push` is presentational: alongside `title` it carries optional `body`,
-`subtitle`, `priority` (`low` | `normal` | `critical`), and `silent`.
 
 ## Test
 
@@ -78,88 +68,37 @@ transport adds `jsonrpc`, never an `id`):
 bun test
 ```
 
-Covers the protocol round-trip/parse, `server/discover` advertising
-`2026-07-28`, the extension-id validity, the tool `_meta` association, the
-`extensions`-capability gap (as a tripwire), and the end-to-end push validated by
-`parseMcpingNotification`.
+Covers `server/discover` advertising the extension, and a subscriber receiving a
+`notifications/mcping/push` that round-trips through `parseMcpingNotification`.
 
 ---
 
-## Design notes (MCP 2026-07-28)
+## Design notes
 
-Every decision below traces to the live draft, read at implementation time —
-spec index <https://modelcontextprotocol.io/specification/draft>, `_meta`/
-extension rules `basic/index#meta` + [extensions/overview](https://modelcontextprotocol.io/extensions/overview),
-subscriptions `basic/patterns/subscriptions`, transport
-`basic/transports/streamable-http`, and the authoritative
-`schema/draft/schema.ts`.
+Why hand-wired instead of a server framework:
 
-### Resolved versions
+- The mcping extension delivers pushes the way Tasks delivers `notifications/tasks`:
+  an extension merges its own field into the `subscriptions/listen` filter (the
+  **Subscription Additions** pattern), and the server pushes the extension's
+  notification on that stream. This is spec-supported (2026-07-28) and keeps a
+  display-only client passive — no tool call.
+- But **no server library at this beta stage can publish a custom notification on
+  a `subscriptions/listen` stream.** `@modelcontextprotocol/server`'s
+  `createMcpHandler` owns that stream and drives it from a **closed four-event
+  bus** (`tools/prompts/resources` list-changed + `resource_updated`); mcp-use@beta
+  exposes only the same four `notify*` methods. There is no seam for a custom
+  event.
+- The v2 **client** SDK, by contrast, fully supports it (`client.listen()` +
+  `setNotificationHandler`) — which is what [`apps/mcping`](../mcping) uses.
 
-- `mcp-use` → **`2.0.0-beta.22`** (the `@beta` dist-tag), pinned exactly in the
-  root catalog and `bun.lock` — no floating tag.
-- It pulls the split v2 SDK `@modelcontextprotocol/{server,client,core}`
-  (`2.0.0-beta.4`), which is ESM-only.
+So this server hand-drives the listen stream itself on top of
+`@modelcontextprotocol/server` (its meta-key constants + the 2026-07-28-capable
+build): it declares the extension in `server/discover`, and on a
+`subscriptions/listen` with `{ push: true }` it acknowledges and streams
+`notifications/mcping/push` frames (subscription-id tagged, keep-alive'd). It's a
+minimal spike — the honest way to demonstrate the extension's subscription push
+until a server framework exposes custom subscription notifications.
 
-### How 2026-07-28 is enabled
-
-Not a flag — it is what the v2 stack serves. `mcp-use@2` builds a fresh SDK
-`McpServer` per request over a session-less Streamable HTTP transport (the
-stateless model), so `getHandler()` answers `server/discover` with
-`supportedVersions: ["2026-07-28"]` and validates per-request `_meta` envelopes.
-Legacy `2025-11-25` traffic is still answered from the same endpoint
-(`ServerConfig.legacy`, default `"stateless"`).
-
-### Extension identifier — `io.github.ilbertt/mcping`
-
-Valid and **non-reserved**: an identifier's prefix is reserved for MCP only when
-its **second label** is `modelcontextprotocol` or `mcp` (`basic/index#meta`).
-Here the labels are `[io, github, ilbertt]` — second label `github` — so it is a
-normal third-party ID (`github` reverses the GitHub Pages domain
-`ilbertt.github.io`). The rule is encoded and tested in
-[`src/extension.ts`](./src/extension.ts) (`isValidThirdPartyExtensionId`). Note
-the notification **method** name stays a plain `notifications/…` string
-(`notifications/mcping/push`, mirroring Tasks' `notifications/tasks`); reverse-DNS
-prefixing applies to identifiers and `_meta`/capability keys, not method names.
-
-### Why the push is delivered inline, not via `subscriptions/listen`
-
-`subscriptions/listen` is **closed**, confirmed from the schema — its
-`notifications` parameter is a fixed `SubscriptionFilter` struct with exactly
-`toolsListChanged` / `promptsListChanged` / `resourcesListChanged` /
-`resourceSubscriptions`, and "the server MUST NOT send notification types the
-client has not explicitly requested." There is no open map for a third party to
-register `notifications/mcping/push`. The spec-sanctioned alternative
-(`basic/transports/streamable-http`, "Receiving Messages") is a **request-scoped
-notification on a tool call's own SSE response stream**: the server MAY send
-notifications before the final response, and they MUST relate to that request.
-So `run-demo-deploy` is the delivery vehicle.
-
-### `mcp-use@beta` limitations (reported, not worked around)
-
-The underlying `@modelcontextprotocol/server` SDK supports both of the following;
-`mcp-use@beta`'s wrapper does not surface them, so — per the brief — they are
-**reported rather than hacked around**:
-
-1. **No custom `extensions` capability.** `mcp-use` hardcodes its server
-   capabilities (`logging`/`tools`/`prompts`/`resources`) with no config
-   passthrough, so `io.github.ilbertt/mcping` cannot appear in `server/discover`.
-   Verified on the wire (the `KNOWN GAP` test asserts `capabilities.extensions`
-   is absent, as a tripwire). The intended declaration lives in
-   [`src/extension.ts`](./src/extension.ts) (`MCPING_EXTENSION_CAPABILITY`) and is
-   mirrored onto the tool's vendor-namespaced `_meta` — the closest
-   spec-legitimate surface `mcp-use` does expose.
-2. **No generic notification sender.** The per-request context exposes only
-   `reportProgress` (`notifications/progress`) and `sendLog`
-   (`notifications/message`); there is no `sendNotification(method, params)`, so
-   the exact `notifications/mcping/push` frame cannot be put on the wire. The demo
-   therefore builds the two real pushes with `@repo/mcping-protocol`, streams the
-   milestones via `reportProgress` (the spec-sanctioned inline channel), and
-   returns the built frames in `structuredContent` so a client validates them
-   with `parseMcpingNotification`. The build→wire→parse contract runs end to end;
-   only the final custom-method frame emission is blocked.
-
-Consequence: because the stateless model removed protocol sessions and
-`mcp-use@beta` removed `sendNotification` / `getActiveSessions` / `server.app`,
-`main`'s unsolicited-broadcast demo and its `--auth` modes don't port as-is; auth
-is deferred on this spike (`main` keeps it).
+> The published `@modelcontextprotocol/server@beta` on npm is still 2025-era
+> (`LATEST_PROTOCOL_VERSION = 2025-11-25`); only the `pkg.pr.new` preview build
+> serves 2026-07-28, so that's what this app pins.

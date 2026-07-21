@@ -1,20 +1,31 @@
+import { MCPING_EXTENSION_ID } from '@repo/mcping-protocol';
 import { createDemoServer, DEMO_HOST, DEMO_MCP_PATH } from '#create-server.ts';
-import { MCPING_EXTENSION_ID } from '#extension.ts';
 
 const PORT = 3050;
 const MCP_URL = `http://${DEMO_HOST}:${PORT}${DEMO_MCP_PATH}`;
 
 const server = createDemoServer();
-const handler = server.getHandler();
-// idleTimeout: 0 disables Bun's 10s socket idle timeout so long-lived SSE
-// response streams (e.g. a subscriptions/listen stream) are not closed while idle.
+
+// idleTimeout: 0 disables Bun's 10s socket idle timeout so the long-lived
+// subscriptions/listen SSE stream is not closed while it sits idle.
 Bun.serve({
   hostname: DEMO_HOST,
   port: PORT,
   idleTimeout: 0,
-  fetch: (request) => handler(request),
+  fetch: (request) => server.fetch(request),
 });
 
 process.stdout.write(
-  `mcping demo server — MCP 2026-07-28 (stateless)\n\nURL: ${MCP_URL}\nExtension: ${MCPING_EXTENSION_ID}\n\nCall the "run-demo-deploy" tool to emit mcping pushes.\n`,
+  `mcping demo server — MCP 2026-07-28 (stateless)\n\nURL: ${MCP_URL}\nExtension: ${MCPING_EXTENSION_ID}\n\nSubscribers receive each line you type as a push.\nType the message to send to mcping:\n> `,
 );
+
+for await (const line of console) {
+  const text = line.trim();
+  if (text) {
+    const notified = server.push({ title: text, body: 'Sent from demo server' });
+    if (notified === 0) {
+      process.stdout.write('No mcping client subscribed.\n');
+    }
+  }
+  process.stdout.write('> ');
+}

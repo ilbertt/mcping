@@ -1,10 +1,10 @@
+import type { Notification } from '@modelcontextprotocol/client';
 import {
   MCPING_METHODS,
   type McpingPushParams,
   parseMcpingNotification,
 } from '@repo/mcping-protocol';
 import { Notification as DesktopNotification } from 'electron';
-import type { Notification } from 'mcp-use/client';
 import { log } from '#main/system/logger.ts';
 import type { McpServer } from '#shared/server.ts';
 

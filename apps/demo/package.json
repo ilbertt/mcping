@@ -15,8 +15,7 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "@repo/mcping-protocol": "workspace:*",
-    "mcp-use": "catalog:",
-    "zod": "catalog:"
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@repo/mcping-protocol": "workspace:*"
   }
 }
